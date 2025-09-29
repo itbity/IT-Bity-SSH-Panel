@@ -1,18 +1,24 @@
-# IT-Bity-SSH-Panel
+# پنل مدیریت سرور SSH
 
-A lightweight web-based SSH server management panel built with Flask.
+یک پنل وب سبک و قدرتمند برای مدیریت سرورهای SSH با استفاده از Flask
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 
-- 🔐 Secure web interface with random URL path
-- 👥 User management (add, delete, modify)
-- 📊 Real-time server monitoring (CPU, RAM, Disk)
-- 🌐 Traffic control and monitoring
-- 🔧 SSH tunneling and UDPGW setup
-- 📱 Responsive design (works on mobile)
+## 🌟 ویژگی‌ها
 
-## Quick Install
+- 🔐 رابط کاربری وب امن با مسیر تصادفی
+- 👥 مدیریت کاربران (افزودن، حذف، ویرایش)
+- 📊 مانیتورینگ لحظه‌ای سرور (CPU، RAM، Disk)
+- 🌐 کنترل و نظارت بر ترافیک
+- 🔧 راه‌اندازی تونل SSH و UDPGW
+- 📱 طراحی واکنش‌گرا (قابل استفاده روی موبایل)
+- 🚀 نصب آسان با یک دستور
+
+## 📦 نصب سریع
+
+### روش اتوماتیک (پیشنهادی)
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/YOUR_USERNAME/ssh-panel/main/install.sh
+wget -O install.sh https://raw.githubusercontent.com/itbity/IT-Bity-SSH-Panel/main/install.sh
 chmod +x install.sh
 sudo ./install.sh

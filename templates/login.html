@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}" dir="{{ 'rtl' if get_locale() == 'fa' else 'ltr' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _('Login') }} - IT Bity SSH Panel</title>
+    
+    {% if get_locale() == 'fa' %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    {% else %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    {% endif %}
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+
+    <!-- Top Controls: Theme & Language -->
+    <div class="top-controls">
+        <button class="control-btn theme-btn" onclick="toggleTheme()" title="{{ _('Toggle Theme') }}">
+            <i id="themeIcon" class="fas fa-moon"></i>
+        </button>
+        <div class="language-dropdown">
+            <button class="control-btn language-btn" id="languageBtn">
+                <i class="fas fa-globe"></i>
+                <span>{{ get_locale().upper() }}</span>
+                <i class="fas fa-chevron-down arrow-icon"></i>
+            </button>
+            <div class="language-menu" id="languageMenu">
+                <a href="{{ url_for('auth.change_language', lang='fa') }}" 
+                   class="language-item {{ 'active' if get_locale() == 'fa' else '' }}">
+                    <span>فارسی</span>
+                    <span class="lang-code">FA</span>
+                </a>
+                <a href="{{ url_for('auth.change_language', lang='en') }}" 
+                   class="language-item {{ 'active' if get_locale() == 'en' else '' }}">
+                    <span>English</span>
+                    <span class="lang-code">EN</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h1 class="panel-title">IT Bity SSH Panel</h1>
+                <p class="panel-subtitle">{{ _('SSH Server Management') }}</p>
+            </div>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                            <i class="fas fa-exclamation-circle {{ 'me-2' if get_locale() == 'en' else 'ms-2' }}"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form id="loginForm" method="POST" action="{{ url_for('auth.login') }}">
+                <div class="user-type-selector mb-4">
+                    <button type="button" class="type-btn active" data-type="admin">
+                        <i class="fas fa-user-shield"></i>
+                        <span>{{ _('Admin') }}</span>
+                    </button>
+                    <button type="button" class="type-btn" data-type="user">
+                        <i class="fas fa-user"></i>
+                        <span>{{ _('User') }}</span>
+                    </button>
+                </div>
+                
+                <input type="hidden" name="user_type" id="userType" value="admin">
+                
+                <div class="form-group mb-3">
+                    <label for="username" class="form-label">
+                        <i class="fas fa-user {{ 'me-2' if get_locale() == 'en' else 'ms-2' }}"></i>
+                        {{ _('Username') }}
+                    </label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            class="form-control glass-input" 
+                            id="username" 
+                            name="username" 
+                            placeholder="{{ _('Enter your username') }}"
+                            required
+                            autocomplete="username"
+                        >
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="password" class="form-label">
+                        <i class="fas fa-lock {{ 'me-2' if get_locale() == 'en' else 'ms-2' }}"></i>
+                        {{ _('Password') }}
+                    </label>
+                    <div class="input-wrapper position-relative">
+                        <input 
+                            type="password" 
+                            class="form-control glass-input" 
+                            id="password" 
+                            name="password" 
+                            placeholder="{{ _('Enter your password') }}"
+                            required
+                            autocomplete="current-password"
+                        >
+                        <button type="button" class="password-toggle" id="togglePassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-check mb-4">
+                    <input class="form-check-input" type="checkbox" id="remember" name="remember">
+                    <label class="form-check-label" for="remember">
+                        {{ _('Remember me') }}
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn-login w-100">
+                    <span class="btn-text">{{ _('Login to Panel') }}</span>
+                    <i class="fas fa-arrow-{{ 'left' if get_locale() == 'fa' else 'right' }} {{ 'ms-2' if get_locale() == 'fa' else 'me-2' }}"></i>
+                </button>
+            </form>
+            
+            <div class="default-credentials">
+                <small>
+                    <i class="fas fa-info-circle {{ 'me-1' if get_locale() == 'en' else 'ms-1' }}"></i>
+                    {{ _('Default credentials') }}: ITBity / Admin
+                </small>
+            </div>
+        </div>
+        
+        <div class="footer-text">
+            <p>Powered by <strong>IT Bity</strong> © 2025</p>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>
