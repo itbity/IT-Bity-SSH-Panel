@@ -45,20 +45,20 @@ fi
 # Get server IP
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
-echo -e "${GREEN}[1/13] Updating system...${NC}"
+echo -e "${GREEN}[1/14] Updating system...${NC}"
 apt update && apt upgrade -y
 
-echo -e "${GREEN}[2/13] Installing MariaDB...${NC}"
+echo -e "${GREEN}[2/14] Installing MariaDB...${NC}"
 apt install -y mariadb-server mariadb-client
 
-echo -e "${GREEN}[3/13] Starting MariaDB...${NC}"
+echo -e "${GREEN}[3/14] Starting MariaDB...${NC}"
 systemctl start mariadb
 systemctl enable mariadb
 
 # Generate random MySQL password
 DB_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
 
-echo -e "${GREEN}[4/13] Creating database and user...${NC}"
+echo -e "${GREEN}[4/14] Creating database and user...${NC}"
 
 # Drop user if exists
 mysql -e "DROP USER IF EXISTS 'itbity'@'localhost';" 2>/dev/null || true
@@ -84,24 +84,24 @@ else
     exit 1
 fi
 
-echo -e "${GREEN}[5/13] Installing Python and dependencies...${NC}"
+echo -e "${GREEN}[5/14] Installing Python and dependencies...${NC}"
 apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config libssl-dev libffi-dev
 
-echo -e "${GREEN}[6/13] Installing Nginx...${NC}"
+echo -e "${GREEN}[6/14] Installing Nginx...${NC}"
 apt install -y nginx
 
-echo -e "${GREEN}[7/13] Setting up project directory...${NC}"
+echo -e "${GREEN}[7/14] Setting up project directory...${NC}"
 mkdir -p $PROJECT_DIR
 echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
 rsync -av --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' --exclude='migrations' "$SCRIPT_DIR/" "$PROJECT_DIR/"
 
 cd $PROJECT_DIR
 
-echo -e "${GREEN}[8/13] Creating virtual environment...${NC}"
+echo -e "${GREEN}[8/14] Creating virtual environment...${NC}"
 python3 -m venv $VENV_DIR
 source $VENV_DIR/bin/activate
 
-echo -e "${GREEN}[9/13] Installing Python packages...${NC}"
+echo -e "${GREEN}[9/14] Installing Python packages...${NC}"
 pip install --upgrade pip setuptools wheel
 pip install --no-cache-dir -r $PROJECT_DIR/requirements.txt
 
@@ -112,7 +112,7 @@ pip install gunicorn
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 PANEL_PATH=$(python3 -c "import secrets; print(secrets.token_hex(16))")
 
-echo -e "${GREEN}[10/13] Creating .env file...${NC}"
+echo -e "${GREEN}[10/14] Creating .env file...${NC}"
 cat > $PROJECT_DIR/.env << EOF
 SECRET_KEY='$SECRET_KEY'
 PANEL_PATH='$PANEL_PATH'
@@ -129,7 +129,46 @@ EOF
 
 chmod 600 $PROJECT_DIR/.env
 
-echo -e "${GREEN}[11/13] Testing application structure...${NC}"
+echo -e "${GREEN}[11/14] Creating WSGI entry point...${NC}"
+
+# Create wsgi.py file
+cat > $PROJECT_DIR/wsgi.py << 'WSGI_PY'
+from app import create_app, db
+from app.models import User
+
+# Create Flask application instance
+application = create_app()
+app = application
+
+@app.cli.command()
+def init_db():
+    """Initialize database with default admin user"""
+    db.create_all()
+    
+    admin = User.query.filter_by(username='ITBity').first()
+    if not admin:
+        admin = User(username='ITBity', user_type='admin')
+        admin.set_password('Admin')
+        db.session.add(admin)
+        db.session.commit()
+        print('Default admin user created: ITBity / Admin')
+    else:
+        print('Admin user already exists')
+
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(
+        host=app.config.get('HOST', '127.0.0.1'),
+        port=app.config.get('PORT', 5000),
+        debug=app.config.get('DEBUG', False)
+    )
+WSGI_PY
+
+chmod +x $PROJECT_DIR/wsgi.py
+echo -e "${GREEN}✓ wsgi.py created${NC}"
+
+echo -e "${GREEN}[12/14] Testing application structure...${NC}"
 cd $PROJECT_DIR
 
 # Test 1: Check if app package exists
@@ -144,7 +183,7 @@ if [ ! -f "$PROJECT_DIR/app/models.py" ]; then
     exit 1
 fi
 
-# Test 3: Try to import app
+# Test 3: Try to import app module
 echo -e "${BLUE}Testing app import...${NC}"
 if ! $VENV_DIR/bin/python3 -c "from app import create_app; print('Import successful')" 2>&1; then
     echo -e "${RED}✗ Failed to import app module!${NC}"
@@ -160,18 +199,18 @@ if ! $VENV_DIR/bin/python3 -c "from app import create_app; app = create_app(); p
     exit 1
 fi
 
-# Test 5: Check if app.py has the app object
-echo -e "${BLUE}Testing app.py structure...${NC}"
-if ! $VENV_DIR/bin/python3 -c "import app as app_module; print(f'App object type: {type(app_module.app)}')" 2>&1; then
-    echo -e "${RED}✗ app.py doesn't expose 'app' object correctly!${NC}"
+# Test 5: Check if wsgi.py works
+echo -e "${BLUE}Testing wsgi.py...${NC}"
+if ! $VENV_DIR/bin/python3 -c "import wsgi; print('✓ wsgi.py works')" 2>&1; then
+    echo -e "${RED}✗ wsgi.py import failed!${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✓ All application tests passed${NC}"
 
-echo -e "${GREEN}[12/13] Initializing database...${NC}"
+echo -e "${GREEN}[13/14] Initializing database...${NC}"
 source $VENV_DIR/bin/activate
-export FLASK_APP=app.py
+export FLASK_APP=wsgi.py
 
 if [ ! -d "$PROJECT_DIR/migrations" ]; then
     flask db init
@@ -207,7 +246,7 @@ with app.app_context():
         print('✓ Admin user already exists')
 PYTHON_SCRIPT
 
-echo -e "${GREEN}[13/13] Configuring services...${NC}"
+echo -e "${GREEN}[14/14] Configuring services...${NC}"
 
 # Nginx configuration
 cat > /etc/nginx/sites-available/itbity-ssh-panel << 'NGINX_CONFIG'
@@ -244,6 +283,7 @@ else
 fi
 
 # Systemd service
+echo -e "${BLUE}Creating systemd service...${NC}"
 cat > /etc/systemd/system/itbity-ssh-panel.service << 'SERVICE'
 [Unit]
 Description=IT Bity SSH Panel
@@ -255,7 +295,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/itbity-ssh-panel
 Environment="PATH=/var/www/itbity-ssh-panel/venv/bin"
-ExecStart=/var/www/itbity-ssh-panel/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --timeout 120 --access-logfile /var/log/itbity-panel-access.log --error-logfile /var/log/itbity-panel-error.log app:app
+ExecStart=/var/www/itbity-ssh-panel/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --timeout 120 --access-logfile /var/log/itbity-panel-access.log --error-logfile /var/log/itbity-panel-error.log wsgi:app
 Restart=always
 RestartSec=3
 StandardOutput=journal
@@ -267,16 +307,17 @@ SERVICE
 
 # Set proper permissions
 chown -R www-data:www-data $PROJECT_DIR
-chmod +x $PROJECT_DIR/app.py
+chmod +x $PROJECT_DIR/wsgi.py
+[ -f "$PROJECT_DIR/app.py" ] && chmod +x $PROJECT_DIR/app.py
 
 # Create log files with proper permissions
 touch /var/log/itbity-panel-access.log /var/log/itbity-panel-error.log
 chown www-data:www-data /var/log/itbity-panel-access.log /var/log/itbity-panel-error.log
 
-# Final test: Run gunicorn as www-data for 2 seconds
-echo -e "${BLUE}Testing Gunicorn startup...${NC}"
-sudo -u www-data $VENV_DIR/bin/gunicorn --bind 127.0.0.1:5001 --timeout 5 app:app --daemon --pid /tmp/test-gunicorn.pid
-sleep 2
+# Final test: Run gunicorn as www-data for 3 seconds
+echo -e "${BLUE}Testing Gunicorn with wsgi.py...${NC}"
+sudo -u www-data $VENV_DIR/bin/gunicorn --bind 127.0.0.1:5001 --timeout 5 wsgi:app --daemon --pid /tmp/test-gunicorn.pid
+sleep 3
 
 if [ -f /tmp/test-gunicorn.pid ]; then
     TEST_PID=$(cat /tmp/test-gunicorn.pid)
@@ -296,12 +337,13 @@ else
 fi
 
 # Start the actual service
+echo -e "${BLUE}Starting panel service...${NC}"
 systemctl daemon-reload
 systemctl enable itbity-ssh-panel
 systemctl start itbity-ssh-panel
 
 # Wait for service to start
-sleep 3
+sleep 5
 
 # Check service status
 if systemctl is-active --quiet itbity-ssh-panel; then
@@ -326,30 +368,37 @@ if command -v ufw &> /dev/null; then
     ufw allow 80/tcp
     ufw allow 443/tcp
     ufw --force enable 2>/dev/null || true
+    echo -e "${GREEN}✓ Firewall configured${NC}"
+else
+    echo -e "${YELLOW}⚠ UFW not found, skipping firewall configuration${NC}"
 fi
 
 echo ""
 echo "========================================"
-echo -e "${GREEN}✓ Installation completed!${NC}"
+echo -e "${GREEN}✓✓✓ Installation Completed! ✓✓✓${NC}"
 echo "========================================"
 echo ""
-echo -e "Panel URL: ${YELLOW}http://${SERVER_IP}/${PANEL_PATH}${NC}"
-echo -e "Username: ${YELLOW}ITBity${NC}"
-echo -e "Password: ${YELLOW}Admin${NC}"
+echo -e "${BLUE}Panel Information:${NC}"
+echo -e "  URL: ${YELLOW}http://${SERVER_IP}/${PANEL_PATH}${NC}"
+echo -e "  Username: ${YELLOW}ITBity${NC}"
+echo -e "  Password: ${YELLOW}Admin${NC}"
 echo ""
-echo -e "${RED}⚠️  IMPORTANT:${NC}"
-echo "1. Change admin password immediately"
-echo "2. Save this URL (it's randomly generated)"
-echo "3. Database credentials: ${PROJECT_DIR}/.env"
+echo -e "${RED}⚠️  SECURITY WARNINGS:${NC}"
+echo "  1. Change admin password IMMEDIATELY"
+echo "  2. Save the panel URL (randomly generated)"
+echo "  3. Database credentials stored in: ${PROJECT_DIR}/.env"
 echo ""
-echo "Commands:"
-echo "  Status: systemctl status itbity-ssh-panel"
-echo "  Logs: journalctl -u itbity-ssh-panel -f"
-echo "  Error log: tail -f /var/log/itbity-panel-error.log"
+echo -e "${BLUE}Service Management:${NC}"
+echo "  Status:  systemctl status itbity-ssh-panel"
+echo "  Logs:    journalctl -u itbity-ssh-panel -f"
+echo "  Errors:  tail -f /var/log/itbity-panel-error.log"
 echo "  Restart: systemctl restart itbity-ssh-panel"
-echo "  Stop: systemctl stop itbity-ssh-panel"
+echo "  Stop:    systemctl stop itbity-ssh-panel"
 echo ""
-echo "Debug commands:"
+echo -e "${BLUE}Debug Commands:${NC}"
 echo "  Test import: cd $PROJECT_DIR && sudo -u www-data ./venv/bin/python3 -c 'from app import create_app; app = create_app()'"
-echo "  Manual run: cd $PROJECT_DIR && sudo -u www-data ./venv/bin/gunicorn --bind 127.0.0.1:5000 app:app"
+echo "  Manual run:  cd $PROJECT_DIR && sudo -u www-data ./venv/bin/gunicorn --bind 127.0.0.1:5000 wsgi:app"
+echo ""
+echo "========================================"
+echo -e "${GREEN}Have a great day! 🚀${NC}"
 echo "========================================"
