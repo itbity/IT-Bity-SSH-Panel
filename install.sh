@@ -265,7 +265,7 @@ server {
 
     # Static files - without panel path prefix
     location /static {
-        alias /var/www/itbity-ssh-panel/app/static/;
+        alias /var/www/itbity-ssh-panel/static/;
         expires 30d;
         access_log off;
         add_header Cache-Control "public, immutable";
