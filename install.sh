@@ -14,6 +14,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Variables
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="/var/www/itbity-ssh-panel"
 VENV_DIR="$PROJECT_DIR/venv"
 DB_NAME="itbitysshpanel"
@@ -25,6 +26,12 @@ echo "========================================"
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
     echo -e "${RED}Error: Please run as root (sudo ./install.sh)${NC}"
+    exit 1
+fi
+
+# Check if requirements.txt exists
+if [ ! -f "$SCRIPT_DIR/requirements.txt" ]; then
+    echo -e "${RED}Error: requirements.txt not found in $SCRIPT_DIR${NC}"
     exit 1
 fi
 
@@ -51,21 +58,20 @@ mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO 'itbity'@'localhost';"
 mysql -e "FLUSH PRIVILEGES;"
 
 echo -e "${GREEN}[5/12] Installing Python and dependencies...${NC}"
-apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential
+apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config
 
 echo -e "${GREEN}[6/12] Installing Nginx...${NC}"
 apt install -y nginx
 
 echo -e "${GREEN}[7/12] Setting up project directory...${NC}"
+# Create project directory if doesn't exist
 mkdir -p $PROJECT_DIR
-cd $PROJECT_DIR
 
-# Copy project files (assuming script runs from project root)
-if [ -d "/tmp/itbity-ssh-panel" ]; then
-    cp -r /tmp/itbity-ssh-panel/* $PROJECT_DIR/
-else
-    echo -e "${YELLOW}Warning: Project files should be in /tmp/itbity-ssh-panel${NC}"
-fi
+# Copy all files from current directory to project directory
+echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
+rsync -av --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' --exclude='migrations' "$SCRIPT_DIR/" "$PROJECT_DIR/"
+
+cd $PROJECT_DIR
 
 echo -e "${GREEN}[8/12] Creating virtual environment...${NC}"
 python3 -m venv $VENV_DIR
@@ -73,7 +79,7 @@ source $VENV_DIR/bin/activate
 
 echo -e "${GREEN}[9/12] Installing Python packages...${NC}"
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r $PROJECT_DIR/requirements.txt
 
 # Generate random secret key and panel path
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
@@ -102,12 +108,17 @@ source $VENV_DIR/bin/activate
 
 # Initialize Flask-Migrate
 export FLASK_APP=app.py
-flask db init 2>/dev/null || true
+
+# Create migrations directory if doesn't exist
+if [ ! -d "$PROJECT_DIR/migrations" ]; then
+    flask db init
+fi
+
 flask db migrate -m "Initial migration" 2>/dev/null || true
 flask db upgrade
 
 # Create default admin user
-python3 << PYTHON_SCRIPT
+python3 << 'PYTHON_SCRIPT'
 from app import create_app, db
 from app.models import User, UserLimit
 
@@ -128,7 +139,9 @@ with app.app_context():
         )
         db.session.add(admin_limits)
         db.session.commit()
-        print('Admin user created')
+        print('✓ Admin user created')
+    else:
+        print('✓ Admin user already exists')
 PYTHON_SCRIPT
 
 echo -e "${GREEN}[12/12] Configuring Nginx...${NC}"
@@ -189,7 +202,7 @@ ufw --force enable 2>/dev/null || true
 
 echo ""
 echo "========================================"
-echo -e "${GREEN}Installation completed successfully!${NC}"
+echo -e "${GREEN}✓ Installation completed successfully!${NC}"
 echo "========================================"
 echo ""
 echo -e "Panel URL: ${YELLOW}http://${SERVER_IP}/${PANEL_PATH}${NC}"
@@ -201,5 +214,8 @@ echo "1. Change admin password immediately"
 echo "2. Save this URL (it's randomly generated)"
 echo "3. Database password saved in: ${PROJECT_DIR}/.env"
 echo ""
-echo "Panel service: systemctl status itbity-ssh-panel"
+echo "Commands:"
+echo "  Service status: systemctl status itbity-ssh-panel"
+echo "  View logs: journalctl -u itbity-ssh-panel -f"
+echo "  Restart: systemctl restart itbity-ssh-panel"
 echo "========================================"
