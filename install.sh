@@ -260,10 +260,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
     }
 
-    location /PANEL_PATH_PLACEHOLDER/static {
-        alias /var/www/itbity-ssh-panel/static/;
+    # Static files - without panel path prefix
+    location /static {
+        alias /var/www/itbity-ssh-panel/app/static/;
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, immutable";
     }
 }
 NGINX_CONFIG
@@ -365,10 +370,13 @@ fi
 # Configure firewall
 echo -e "${GREEN}Configuring firewall...${NC}"
 if command -v ufw &> /dev/null; then
-    ufw allow 80/tcp
-    ufw allow 443/tcp
+    echo -e "${BLUE}Setting up firewall rules...${NC}"
+    ufw allow 22/tcp       # SSH - CRITICAL!
+    ufw allow 80/tcp       # HTTP
+    ufw allow 443/tcp      # HTTPS
     ufw --force enable 2>/dev/null || true
-    echo -e "${GREEN}✓ Firewall configured${NC}"
+    echo -e "${GREEN}✓ Firewall configured (SSH, HTTP, HTTPS allowed)${NC}"
+    ufw status numbered
 else
     echo -e "${YELLOW}⚠ UFW not found, skipping firewall configuration${NC}"
 fi
