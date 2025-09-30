@@ -1,12 +1,15 @@
+# app/__init__.py
 from flask import Flask, request, session
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from config import Config
 
 db = SQLAlchemy()
 babel = Babel()
 login_manager = LoginManager()
+migrate = Migrate()
 
 def get_locale():
     if 'language' in session:
@@ -18,14 +21,13 @@ def create_app(config_class=Config):
                 template_folder='../templates',
                 static_folder='../static')
     app.config.from_object(config_class)
-    
-    # غیرفعال کردن strict slashes
     app.url_map.strict_slashes = False
     
     # Initialize extensions
     db.init_app(app)
     babel.init_app(app, locale_selector=get_locale)
     login_manager.init_app(app)
+    migrate.init_app(app, db)
     
     # Flask-Login settings
     login_manager.login_view = 'auth.login_page'
@@ -36,7 +38,6 @@ def create_app(config_class=Config):
         from app.models import User
         return User.query.get(int(user_id))
     
-    # اضافه کردن get_locale به template context
     @app.context_processor
     def inject_locale():
         return dict(get_locale=get_locale)
