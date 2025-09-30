@@ -19,6 +19,6 @@
 
 ### روش اتوماتیک (پیشنهادی)
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/itbity/IT-Bity-SSH-Panel/main/install.sh
-chmod +x install.sh
-sudo ./install.sh
+git clone https://github.com/itbity/IT-Bity-SSH-Panel.git
+cd IT-Bity-SSH-Panel
+sudo bash install.sh

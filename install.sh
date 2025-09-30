@@ -52,22 +52,39 @@ systemctl enable mariadb
 DB_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
 
 echo -e "${GREEN}[4/12] Creating database and user...${NC}"
+
+# Drop user if exists (clean setup)
+mysql -e "DROP USER IF EXISTS 'itbity'@'localhost';" 2>/dev/null || true
+
+# Create database
 mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -e "CREATE USER IF NOT EXISTS 'itbity'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+
+# Create user with mysql_native_password
+mysql -e "CREATE USER 'itbity'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASSWORD}';"
+
+# Grant privileges
 mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO 'itbity'@'localhost';"
+
+# Flush privileges
 mysql -e "FLUSH PRIVILEGES;"
 
+# Test connection
+echo "Testing database connection..."
+if mysql -u itbity -p"${DB_PASSWORD}" -e "USE ${DB_NAME};" 2>/dev/null; then
+    echo -e "${GREEN}✓ Database connection successful${NC}"
+else
+    echo -e "${RED}✗ Database connection failed!${NC}"
+    exit 1
+fi
+
 echo -e "${GREEN}[5/12] Installing Python and dependencies...${NC}"
-apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config
+apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config libssl-dev libffi-dev
 
 echo -e "${GREEN}[6/12] Installing Nginx...${NC}"
 apt install -y nginx
 
 echo -e "${GREEN}[7/12] Setting up project directory...${NC}"
-# Create project directory if doesn't exist
 mkdir -p $PROJECT_DIR
-
-# Copy all files from current directory to project directory
 echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
 rsync -av --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' --exclude='migrations' "$SCRIPT_DIR/" "$PROJECT_DIR/"
 
@@ -78,8 +95,8 @@ python3 -m venv $VENV_DIR
 source $VENV_DIR/bin/activate
 
 echo -e "${GREEN}[9/12] Installing Python packages...${NC}"
-pip install --upgrade pip
-pip install -r $PROJECT_DIR/requirements.txt
+pip install --upgrade pip setuptools wheel
+pip install --no-cache-dir -r $PROJECT_DIR/requirements.txt
 
 # Generate random secret key and panel path
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
@@ -106,15 +123,13 @@ echo -e "${GREEN}[11/12] Initializing database...${NC}"
 cd $PROJECT_DIR
 source $VENV_DIR/bin/activate
 
-# Initialize Flask-Migrate
 export FLASK_APP=app.py
 
-# Create migrations directory if doesn't exist
 if [ ! -d "$PROJECT_DIR/migrations" ]; then
     flask db init
 fi
 
-flask db migrate -m "Initial migration" 2>/dev/null || true
+flask db migrate -m "Initial migration" 2>/dev/null || echo "Migration already exists"
 flask db upgrade
 
 # Create default admin user
@@ -150,7 +165,7 @@ server {
     listen 80;
     server_name _;
 
-    location /${PANEL_PATH}/ {
+    location /${PANEL_PATH} {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -158,7 +173,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    location /${PANEL_PATH}/static/ {
+    location /${PANEL_PATH}/static {
         alias ${PROJECT_DIR}/static/;
     }
 }
@@ -187,12 +202,22 @@ Restart=always
 WantedBy=multi-user.target
 SERVICE
 
-# Set permissions
 chown -R www-data:www-data $PROJECT_DIR
 
 systemctl daemon-reload
 systemctl enable itbity-ssh-panel
 systemctl start itbity-ssh-panel
+
+# Wait for service to start
+sleep 3
+
+# Check service status
+if systemctl is-active --quiet itbity-ssh-panel; then
+    echo -e "${GREEN}✓ Panel service started successfully${NC}"
+else
+    echo -e "${YELLOW}⚠ Panel service status:${NC}"
+    systemctl status itbity-ssh-panel --no-pager -l
+fi
 
 # Configure firewall
 echo -e "${GREEN}Configuring firewall...${NC}"
@@ -212,10 +237,10 @@ echo ""
 echo -e "${RED}⚠️  IMPORTANT:${NC}"
 echo "1. Change admin password immediately"
 echo "2. Save this URL (it's randomly generated)"
-echo "3. Database password saved in: ${PROJECT_DIR}/.env"
+echo "3. Database credentials: ${PROJECT_DIR}/.env"
 echo ""
 echo "Commands:"
-echo "  Service status: systemctl status itbity-ssh-panel"
-echo "  View logs: journalctl -u itbity-ssh-panel -f"
+echo "  Status: systemctl status itbity-ssh-panel"
+echo "  Logs: journalctl -u itbity-ssh-panel -f"
 echo "  Restart: systemctl restart itbity-ssh-panel"
 echo "========================================"
