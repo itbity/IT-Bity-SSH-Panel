@@ -1,0 +1,63 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap');
+
+/* Global CSS Variables */
+:root {
+    /* Colors */
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --bg-light: #ffffff;
+    --bg-secondary: #f8fafc;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --success: #10b981;
+    --danger: #ef4444;
+    
+    /* Layout */
+    --navbar-height: 64px;
+    --sidebar-width: 260px;
+    
+    /* Fonts */
+    --font-en: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-fa: 'Vazirmatn', sans-serif;
+}
+
+[data-theme="dark"] {
+    --primary: #6366f1;
+    --primary-dark: #818cf8;
+    --bg-light: #1e293b;
+    --bg-secondary: #0f172a;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border: #334155;
+    --shadow: rgba(0, 0, 0, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-en);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Apply Vazirmatn for Persian/RTL */
+[dir="rtl"] body,
+[dir="rtl"] * {
+    font-family: var(--font-fa);
+}
+
+/* Better text rendering for Persian */
+[dir="rtl"] {
+    font-feature-settings: "kern" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}

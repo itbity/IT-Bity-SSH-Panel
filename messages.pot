@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-09-29 20:12+0200\n"
+"POT-Creation-Date: 2025-10-03 18:36+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,59 +25,179 @@ msgstr ""
 msgid "Connected successfully"
 msgstr ""
 
-#: app/auth.py:32
+#: app/auth.py:37
 msgid "Successfully logged in!"
 msgstr ""
 
-#: app/auth.py:37
+#: app/auth.py:46
 msgid "Invalid username or password!"
 msgstr ""
 
-#: app/auth.py:44
+#: app/auth.py:53
 msgid "Successfully logged out!"
+msgstr ""
+
+#: templates/admindashboard.html:6
+msgid "Admin Dashboard"
+msgstr ""
+
+#: templates/admindashboard.html:38
+msgid "Welcome back"
+msgstr ""
+
+#: templates/admindashboard.html:39
+msgid "Here is your dashboard overview"
+msgstr ""
+
+#: templates/admindashboard.html:53
+msgid "Total Users"
+msgstr ""
+
+#: templates/admindashboard.html:63
+msgid "Active Users"
+msgstr ""
+
+#: templates/admindashboard.html:73
+msgid "Total Traffic"
+msgstr ""
+
+#: templates/admindashboard.html:83
+msgid "Active Connections"
+msgstr ""
+
+#: templates/admindashboard.html:93
+msgid "Quick Actions"
+msgstr ""
+
+#: templates/admindashboard.html:98
+msgid "Add New User"
+msgstr ""
+
+#: templates/admindashboard.html:102
+msgid "View Reports"
+msgstr ""
+
+#: templates/admindashboard.html:106
+msgid "Database Backup"
+msgstr ""
+
+#: templates/admindashboard.html:110
+msgid "Notifications"
+msgstr ""
+
+#: templates/admindashboard.html:119
+msgid "Recent Activity"
+msgstr ""
+
+#: templates/admindashboard.html:127
+msgid "New user registered"
+msgstr ""
+
+#: templates/admindashboard.html:128
+msgid "2 minutes ago"
+msgstr ""
+
+#: templates/admindashboard.html:137
+msgid "User logged in"
+msgstr ""
+
+#: templates/admindashboard.html:138
+msgid "15 minutes ago"
+msgstr ""
+
+#: templates/admindashboard.html:147
+msgid "Traffic limit warning"
+msgstr ""
+
+#: templates/admindashboard.html:148
+msgid "1 hour ago"
+msgstr ""
+
+#: templates/admindashboard.html:157
+msgid "User deactivated"
+msgstr ""
+
+#: templates/admindashboard.html:158
+msgid "3 hours ago"
 msgstr ""
 
 #: templates/login.html:6
 msgid "Login"
 msgstr ""
 
-#: templates/login.html:43
+#: templates/login.html:21 templates/shared/navbar.html:24
+msgid "Toggle Theme"
+msgstr ""
+
+#: templates/login.html:52
 msgid "SSH Server Management"
 msgstr ""
 
-#: templates/login.html:62
+#: templates/login.html:71
 msgid "Admin"
 msgstr ""
 
-#: templates/login.html:66
+#: templates/login.html:75
 msgid "User"
 msgstr ""
 
-#: templates/login.html:75
+#: templates/login.html:84
 msgid "Username"
 msgstr ""
 
-#: templates/login.html:83
+#: templates/login.html:92
 msgid "Enter your username"
 msgstr ""
 
-#: templates/login.html:93
+#: templates/login.html:102
 msgid "Password"
 msgstr ""
 
-#: templates/login.html:101
+#: templates/login.html:110
 msgid "Enter your password"
 msgstr ""
 
-#: templates/login.html:114
+#: templates/login.html:123
 msgid "Remember me"
 msgstr ""
 
-#: templates/login.html:119
+#: templates/login.html:128
 msgid "Login to Panel"
 msgstr ""
 
-#: templates/login.html:127
+#: templates/login.html:136
 msgid "Default credentials"
+msgstr ""
+
+#: templates/shared/footer.html:9
+msgid "Documentation"
+msgstr ""
+
+#: templates/shared/footer.html:10
+msgid "Support"
+msgstr ""
+
+#: templates/shared/footer.html:11
+msgid "Privacy"
+msgstr ""
+
+#: templates/shared/footer.html:15
+msgid "All rights reserved"
+msgstr ""
+
+#: templates/shared/navbar.html:67
+msgid "Home"
+msgstr ""
+
+#: templates/shared/navbar.html:71
+msgid "User Management"
+msgstr ""
+
+#: templates/shared/navbar.html:75
+msgid "Settings"
+msgstr ""
+
+#: templates/shared/navbar.html:80
+msgid "Logout"
 msgstr ""
 

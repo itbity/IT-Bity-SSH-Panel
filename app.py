@@ -26,6 +26,6 @@ if __name__ == '__main__':
         db.create_all()
     app.run(
         host=app.config.get('HOST', '127.0.0.1'),
-        port=app.config.get('PORT', 5000),
+        port=app.config.get('PORT', 5001),
         debug=app.config.get('DEBUG', False)
     )

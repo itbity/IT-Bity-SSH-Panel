@@ -7,7 +7,6 @@ from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 
-
 @auth_bp.route('', methods=['GET'])  
 def login_page():
     if current_user.is_authenticated:
@@ -21,18 +20,28 @@ def login():
     user_type = request.form.get('user_type', 'user')
     remember = request.form.get('remember', False)
     
-    user = User.query.filter_by(username=username, user_type=user_type).first()
+    print(f'DEBUG: Login attempt - Username: {username}, Type: {user_type}')
     
-    if user and user.check_password(password):
-        login_user(user, remember=remember)
-        
-        user.last_login = datetime.utcnow()
-        db.session.commit()
-        
-        flash(_('Successfully logged in!'), 'success')
-        
-        next_page = request.args.get('next')
-        return redirect(next_page or url_for('main.dashboard'))
+    # جستجو با role به جای user_type
+    user = User.query.filter_by(username=username, role=user_type).first()
+    
+    if user:
+        print(f'DEBUG: User found - {user.username}, Role: {user.role}')
+        if user.check_password(password):
+            print('DEBUG: Password correct')
+            login_user(user, remember=remember)
+            
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
+            flash(_('Successfully logged in!'), 'success')
+            
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('main.dashboard'))
+        else:
+            print('DEBUG: Password incorrect')
+    else:
+        print(f'DEBUG: User not found with username={username} and role={user_type}')
     
     flash(_('Invalid username or password!'), 'error')
     return redirect(url_for('auth.login_page'))

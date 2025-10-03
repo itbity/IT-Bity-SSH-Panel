@@ -1,0 +1,86 @@
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="navbar-container">
+        <!-- Logo & Brand -->
+        <div class="navbar-brand">
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="brand-logo">
+                <i class="fas fa-server"></i>
+                <span class="brand-text">IT Bity Panel</span>
+            </div>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="navbar-controls">
+            <!-- User Info -->
+            <div class="user-info-badge">
+                <i class="fas fa-user-circle"></i>
+                <span class="user-name">{{ current_user.username }}</span>
+            </div>
+
+            <!-- Theme Toggle -->
+            <button class="control-btn theme-btn" onclick="toggleTheme()" title="{{ _('Toggle Theme') }}">
+                <i id="themeIcon" class="fas fa-moon"></i>
+            </button>
+
+            <!-- Language Dropdown -->
+            <div class="language-dropdown">
+                <button class="control-btn language-btn" id="languageBtn">
+                    <i class="fas fa-globe"></i>
+                    <span>{{ get_locale().upper() }}</span>
+                    <i class="fas fa-chevron-down arrow-icon"></i>
+                </button>
+                <div class="language-menu" id="languageMenu">
+                    <a href="{{ url_for('auth.change_language', lang='fa') }}" 
+                       class="language-item {{ 'active' if get_locale() == 'fa' else '' }}">
+                        <span>فارسی</span>
+                        <span class="lang-code">FA</span>
+                    </a>
+                    <a href="{{ url_for('auth.change_language', lang='en') }}" 
+                       class="language-item {{ 'active' if get_locale() == 'en' else '' }}">
+                        <span>English</span>
+                        <span class="lang-code">EN</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Sidebar Menu -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-brand">
+            <i class="fas fa-server"></i>
+            <span>IT Bity</span>
+        </div>
+        <button class="sidebar-close" id="sidebarClose">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <nav class="sidebar-menu">
+        <a href="{{ url_for('main.dashboard') }}" class="menu-item active">
+            <i class="fas fa-home"></i>
+            <span>{{ _('Home') }}</span>
+        </a>
+        <a href="#" class="menu-item">
+            <i class="fas fa-users"></i>
+            <span>{{ _('User Management') }}</span>
+        </a>
+        <a href="#" class="menu-item">
+            <i class="fas fa-cog"></i>
+            <span>{{ _('Settings') }}</span>
+        </a>
+        <div class="menu-divider"></div>
+        <a href="{{ url_for('auth.logout') }}" class="menu-item logout-item">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>{{ _('Logout') }}</span>
+        </a>
+    </nav>
+</aside>
+
+<!-- Sidebar Overlay (for mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>

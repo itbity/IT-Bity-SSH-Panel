@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-09-29 20:12+0200\n"
+"POT-Creation-Date: 2025-10-03 18:36+0200\n"
 "PO-Revision-Date: 2025-09-29 20:14+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fa\n"
@@ -18,67 +18,186 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-
 #: app/api.py:10
 msgid "Not authenticated"
-msgstr "وارد نشده‌اید"
+msgstr "احراز هویت نشده"
 
 #: app/api.py:13
 msgid "Connected successfully"
 msgstr "اتصال با موفقیت برقرار شد"
 
-#: app/auth.py:32
+#: app/auth.py:37
 msgid "Successfully logged in!"
 msgstr "با موفقیت وارد شدید!"
 
-#: app/auth.py:37
+#: app/auth.py:46
 msgid "Invalid username or password!"
 msgstr "نام کاربری یا رمز عبور اشتباه است!"
 
-#: app/auth.py:44
+#: app/auth.py:53
 msgid "Successfully logged out!"
 msgstr "با موفقیت خارج شدید!"
+
+#: templates/admindashboard.html:6
+msgid "Admin Dashboard"
+msgstr "داشبورد مدیریت"
+
+#: templates/admindashboard.html:38
+msgid "Welcome back"
+msgstr "خوش آمدید"
+
+#: templates/admindashboard.html:39
+msgid "Here is your dashboard overview"
+msgstr "این خلاصه‌ای از داشبورد شماست"
+
+#: templates/admindashboard.html:53
+msgid "Total Users"
+msgstr "کل کاربران"
+
+#: templates/admindashboard.html:63
+msgid "Active Users"
+msgstr "کاربران فعال"
+
+#: templates/admindashboard.html:73
+msgid "Total Traffic"
+msgstr "کل ترافیک"
+
+#: templates/admindashboard.html:83
+msgid "Active Connections"
+msgstr "اتصالات فعال"
+
+#: templates/admindashboard.html:93
+msgid "Quick Actions"
+msgstr "اقدامات سریع"
+
+#: templates/admindashboard.html:98
+msgid "Add New User"
+msgstr "افزودن کاربر جدید"
+
+#: templates/admindashboard.html:102
+msgid "View Reports"
+msgstr "مشاهده گزارش‌ها"
+
+#: templates/admindashboard.html:106
+msgid "Database Backup"
+msgstr "پشتیبان‌گیری دیتابیس"
+
+#: templates/admindashboard.html:110
+msgid "Notifications"
+msgstr "اعلان‌ها"
+
+#: templates/admindashboard.html:119
+msgid "Recent Activity"
+msgstr "فعالیت‌های اخیر"
+
+#: templates/admindashboard.html:127
+msgid "New user registered"
+msgstr "کاربر جدید ثبت‌نام کرد"
+
+#: templates/admindashboard.html:128
+msgid "2 minutes ago"
+msgstr "۲ دقیقه پیش"
+
+#: templates/admindashboard.html:137
+msgid "User logged in"
+msgstr "کاربر وارد شد"
+
+#: templates/admindashboard.html:138
+msgid "15 minutes ago"
+msgstr "۱۵ دقیقه پیش"
+
+#: templates/admindashboard.html:147
+msgid "Traffic limit warning"
+msgstr "هشدار محدودیت ترافیک"
+
+#: templates/admindashboard.html:148
+msgid "1 hour ago"
+msgstr "۱ ساعت پیش"
+
+#: templates/admindashboard.html:157
+msgid "User deactivated"
+msgstr "کاربر غیرفعال شد"
+
+#: templates/admindashboard.html:158
+msgid "3 hours ago"
+msgstr "۳ ساعت پیش"
 
 #: templates/login.html:6
 msgid "Login"
 msgstr "ورود"
 
-#: templates/login.html:43
+#: templates/login.html:21 templates/shared/navbar.html:24
+msgid "Toggle Theme"
+msgstr "تغییر تم"
+
+#: templates/login.html:52
 msgid "SSH Server Management"
 msgstr "مدیریت سرورهای SSH"
 
-#: templates/login.html:62
+#: templates/login.html:71
 msgid "Admin"
 msgstr "مدیر"
 
-#: templates/login.html:66
+#: templates/login.html:75
 msgid "User"
 msgstr "کاربر"
 
-#: templates/login.html:75
+#: templates/login.html:84
 msgid "Username"
 msgstr "نام کاربری"
 
-#: templates/login.html:83
+#: templates/login.html:92
 msgid "Enter your username"
 msgstr "نام کاربری خود را وارد کنید"
 
-#: templates/login.html:93
+#: templates/login.html:102
 msgid "Password"
 msgstr "رمز عبور"
 
-#: templates/login.html:101
+#: templates/login.html:110
 msgid "Enter your password"
 msgstr "رمز عبور را وارد کنید"
 
-#: templates/login.html:114
+#: templates/login.html:123
 msgid "Remember me"
 msgstr "مرا به خاطر بسپار"
 
-#: templates/login.html:119
+#: templates/login.html:128
 msgid "Login to Panel"
 msgstr "ورود به پنل"
 
-#: templates/login.html:127
+#: templates/login.html:136
 msgid "Default credentials"
 msgstr "اطلاعات پیش‌فرض"
+
+#: templates/shared/footer.html:9
+msgid "Documentation"
+msgstr "مستندات"
+
+#: templates/shared/footer.html:10
+msgid "Support"
+msgstr "پشتیبانی"
+
+#: templates/shared/footer.html:11
+msgid "Privacy"
+msgstr "حریم خصوصی"
+
+#: templates/shared/footer.html:15
+msgid "All rights reserved"
+msgstr "تمامی حقوق محفوظ است"
+
+#: templates/shared/navbar.html:67
+msgid "Home"
+msgstr "خانه"
+
+#: templates/shared/navbar.html:71
+msgid "User Management"
+msgstr "مدیریت کاربران"
+
+#: templates/shared/navbar.html:75
+msgid "Settings"
+msgstr "تنظیمات"
+
+#: templates/shared/navbar.html:80
+msgid "Logout"
+msgstr "خروج"
