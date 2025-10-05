@@ -201,3 +201,42 @@ msgstr "تنظیمات"
 #: templates/shared/navbar.html:80
 msgid "Logout"
 msgstr "خروج"
+
+msgid "Manage all users and their permissions"
+msgstr "مدیریت تمام کاربران و دسترسی‌های آن‌ها"
+
+msgid "Search users..."
+msgstr "جستجوی کاربران..."
+
+msgid "All"
+msgstr "همه"
+
+msgid "Admins"
+msgstr "مدیران"
+
+msgid "Users List"
+msgstr "لیست کاربران"
+
+msgid "Role"
+msgstr "نقش"
+
+msgid "Status"
+msgstr "وضعیت"
+
+msgid "Created"
+msgstr "تاریخ ایجاد"
+
+msgid "Traffic"
+msgstr "ترافیک"
+
+msgid "Actions"
+msgstr "اقدامات"
+
+msgid "Loading users..."
+msgstr "در حال بارگذاری کاربران..."
+
+msgid "Administrators"
+msgstr "مدیران"
+
+msgid "Access denied. Admin privileges required."
+msgstr "دسترسی رد شد. نیاز به دسترسی مدیر."

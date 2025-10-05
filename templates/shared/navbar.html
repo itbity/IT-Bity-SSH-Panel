@@ -62,11 +62,11 @@
     </div>
 
     <nav class="sidebar-menu">
-        <a href="{{ url_for('main.dashboard') }}" class="menu-item active">
+        <a href="{{ url_for('main.dashboard') }}" class="menu-item {{ 'active' if request.endpoint == 'main.dashboard' else '' }}">
             <i class="fas fa-home"></i>
             <span>{{ _('Home') }}</span>
         </a>
-        <a href="#" class="menu-item">
+        <a href="{{ url_for('user_management.users_page') }}" class="menu-item {{ 'active' if request.endpoint == 'user_management.users_page' else '' }}">
             <i class="fas fa-users"></i>
             <span>{{ _('User Management') }}</span>
         </a>
