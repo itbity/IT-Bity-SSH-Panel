@@ -240,3 +240,111 @@ msgstr "مدیران"
 
 msgid "Access denied. Admin privileges required."
 msgstr "دسترسی رد شد. نیاز به دسترسی مدیر."
+
+msgid "Configure panel settings and system preferences"
+msgstr "پیکربندی تنظیمات پنل و تنظیمات سیستم"
+
+msgid "SSL Certificate"
+msgstr "گواهی SSL"
+
+msgid "Install and manage SSL certificates"
+msgstr "نصب و مدیریت گواهی‌های SSL"
+
+msgid "Auto-renew"
+msgstr "تمدید خودکار"
+
+msgid "Automatically renew SSL certificate"
+msgstr "تمدید خودکار گواهی SSL"
+
+msgid "Install SSL"
+msgstr "نصب SSL"
+
+msgid "SSH Configuration"
+msgstr "پیکربندی SSH"
+
+msgid "Configure SSH encryption and protocols"
+msgstr "پیکربندی رمزنگاری و پروتکل‌های SSH"
+
+msgid "Encryption Type"
+msgstr "نوع رمزنگاری"
+
+msgid "Choose encryption algorithm"
+msgstr "انتخاب الگوریتم رمزنگاری"
+
+msgid "Enable UDP"
+msgstr "فعال‌سازی UDP"
+
+msgid "Use UDP for faster connections"
+msgstr "استفاده از UDP برای اتصالات سریع‌تر"
+
+msgid "Compression"
+msgstr "فشرده‌سازی"
+
+msgid "Enable data compression"
+msgstr "فعال‌سازی فشرده‌سازی داده"
+
+msgid "Save Configuration"
+msgstr "ذخیره پیکربندی"
+
+msgid "Two-Factor Authentication"
+msgstr "احراز هویت دو مرحله‌ای"
+
+msgid "Add extra security layer"
+msgstr "افزودن لایه امنیتی اضافی"
+
+msgid "Disabled"
+msgstr "غیرفعال"
+
+msgid "Enable 2FA"
+msgstr "فعال‌سازی 2FA"
+
+msgid "Require 2FA for admin login"
+msgstr "الزامی کردن 2FA برای ورود مدیر"
+
+msgid "Enforce for all users"
+msgstr "اجباری برای همه کاربران"
+
+msgid "Make 2FA mandatory"
+msgstr "اجباری کردن 2FA"
+
+msgid "User Panel Access"
+msgstr "دسترسی پنل کاربری"
+
+msgid "Control user panel availability"
+msgstr "کنترل در دسترس بودن پنل کاربری"
+
+msgid "Enable User Panel"
+msgstr "فعال‌سازی پنل کاربری"
+
+msgid "Allow users to access their panel"
+msgstr "اجازه دسترسی کاربران به پنل خود"
+
+msgid "Static Website"
+msgstr "وبسایت استاتیک"
+
+msgid "Upload and manage static website"
+msgstr "آپلود و مدیریت وبسایت استاتیک"
+
+msgid "Drag and drop ZIP file or click to browse"
+msgstr "فایل ZIP را بکشید و رها کنید یا کلیک کنید"
+
+msgid "Choose File"
+msgstr "انتخاب فایل"
+
+msgid "Backup & Restore"
+msgstr "پشتیبان‌گیری و بازیابی"
+
+msgid "Manage system backups"
+msgstr "مدیریت پشتیبان‌های سیستم"
+
+msgid "Create Backup"
+msgstr "ایجاد پشتیبان"
+
+msgid "Restore from Backup"
+msgstr "بازیابی از پشتیبان"
+
+msgid "Last backup"
+msgstr "آخرین پشتیبان"
+
+msgid "Never"
+msgstr "هرگز"

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}" dir="{{ 'rtl' if get_locale() == 'fa' else 'ltr' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _('Settings') }} - IT Bity SSH Panel</title>
+    
+    <!-- Google Fonts - Vazirmatn -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap RTL/LTR -->
+    {% if get_locale() == 'fa' %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    {% else %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    {% endif %}
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    
+    <style>
+        [dir="rtl"] body {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        
+        [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, 
+        [dir="rtl"] p, [dir="rtl"] span, [dir="rtl"] a, 
+        [dir="rtl"] button, [dir="rtl"] label {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        
+        i[class*="fa"], .fa, .fas, .far, .fab {
+            font-family: "Font Awesome 6 Free" !important;
+            font-weight: 900 !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Navbar -->
+    {% include 'shared/navbar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="header-content">
+                    <h1 class="page-title">
+                        <i class="fas fa-cog"></i>
+                        {{ _('Settings') }}
+                    </h1>
+                    <p class="page-subtitle">{{ _('Configure panel settings and system preferences') }}</p>
+                </div>
+            </div>
+
+            <!-- Settings Grid -->
+            <div class="settings-grid">
+                
+                <!-- SSL Certificate -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon ssl">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('SSL Certificate') }}</h3>
+                            <p>{{ _('Install and manage SSL certificates') }}</p>
+                        </div>
+                        <div class="status-badge inactive">
+                            <i class="fas fa-circle"></i>
+                            {{ _('Inactive') }}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Auto-renew') }}</label>
+                                <span class="setting-desc">{{ _('Automatically renew SSL certificate') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="sslAutoRenew">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <button class="btn-action" onclick="installSSL()">
+                            <i class="fas fa-download"></i>
+                            {{ _('Install SSL') }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SSH Configuration -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon ssh">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('SSH Configuration') }}</h3>
+                            <p>{{ _('Configure SSH encryption and protocols') }}</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Encryption Type') }}</label>
+                                <span class="setting-desc">{{ _('Choose encryption algorithm') }}</span>
+                            </div>
+                            <select class="form-select" id="encryptionType">
+                                <option value="aes256-ctr">AES256-CTR</option>
+                                <option value="aes128-ctr">AES128-CTR</option>
+                                <option value="chacha20">ChaCha20</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Enable UDP') }}</label>
+                                <span class="setting-desc">{{ _('Use UDP for faster connections') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="sshUDP">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Compression') }}</label>
+                                <span class="setting-desc">{{ _('Enable data compression') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="sshCompression" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <button class="btn-action" onclick="saveSSHConfig()">
+                            <i class="fas fa-save"></i>
+                            {{ _('Save Configuration') }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Two-Factor Authentication -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon security">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('Two-Factor Authentication') }}</h3>
+                            <p>{{ _('Add extra security layer') }}</p>
+                        </div>
+                        <div class="status-badge inactive">
+                            <i class="fas fa-circle"></i>
+                            {{ _('Disabled') }}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Enable 2FA') }}</label>
+                                <span class="setting-desc">{{ _('Require 2FA for admin login') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="enable2FA">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Enforce for all users') }}</label>
+                                <span class="setting-desc">{{ _('Make 2FA mandatory') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="enforce2FA" disabled>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Panel Access -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon users">
+                            <i class="fas fa-users-cog"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('User Panel Access') }}</h3>
+                            <p>{{ _('Control user panel availability') }}</p>
+                        </div>
+                        <div class="status-badge active">
+                            <i class="fas fa-circle"></i>
+                            {{ _('Active') }}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <label>{{ _('Enable User Panel') }}</label>
+                                <span class="setting-desc">{{ _('Allow users to access their panel') }}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="userPanelAccess" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Static Website Upload -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon website">
+                            <i class="fas fa-globe"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('Static Website') }}</h3>
+                            <p>{{ _('Upload and manage static website') }}</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-zone" id="uploadZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>{{ _('Drag and drop ZIP file or click to browse') }}</p>
+                            <input type="file" id="fileInput" accept=".zip" hidden>
+                            <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+                                {{ _('Choose File') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backup & Restore -->
+                <div class="setting-card">
+                    <div class="card-header">
+                        <div class="header-icon backup">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="header-text">
+                            <h3>{{ _('Backup & Restore') }}</h3>
+                            <p>{{ _('Manage system backups') }}</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="backup-actions">
+                            <button class="btn-action primary" onclick="createBackup()">
+                                <i class="fas fa-download"></i>
+                                {{ _('Create Backup') }}
+                            </button>
+                            <button class="btn-action secondary" onclick="restoreBackup()">
+                                <i class="fas fa-upload"></i>
+                                {{ _('Restore from Backup') }}
+                            </button>
+                        </div>
+                        <div class="backup-info">
+                            <small>
+                                <i class="fas fa-info-circle"></i>
+                                {{ _('Last backup') }}: {{ _('Never') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Include Footer -->
+    {% include 'shared/footer.html' %}
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+</body>
+</html>

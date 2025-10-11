@@ -70,7 +70,7 @@
             <i class="fas fa-users"></i>
             <span>{{ _('User Management') }}</span>
         </a>
-        <a href="#" class="menu-item">
+        <a href="{{ url_for('settings.settings_page') }}" class="menu-item {{ 'active' if request.endpoint == 'settings.settings_page' else '' }}">
             <i class="fas fa-cog"></i>
             <span>{{ _('Settings') }}</span>
         </a>
