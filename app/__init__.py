@@ -49,7 +49,7 @@ def create_app(config_class=Config):
     from app.user_management import user_management_bp
     from app.settings import settings_bp
     
-    app.register_blueprint(main_bp)
+    app.register_blueprint(main_bp, url_prefix=f'/{app.config["PANEL_PATH"]}')
     app.register_blueprint(auth_bp, url_prefix=f'/{app.config["PANEL_PATH"]}')
     app.register_blueprint(api_bp, url_prefix=f'/{app.config["PANEL_PATH"]}/api')
     app.register_blueprint(user_management_bp, url_prefix=f'/{app.config["PANEL_PATH"]}/user_management')

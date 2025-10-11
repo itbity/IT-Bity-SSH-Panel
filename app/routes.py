@@ -5,16 +5,14 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
-
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
-
     return redirect(url_for('auth.login_page'))
 
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.user_type == 'admin':
+    if current_user.role == 'admin':
         return render_template('admindashboard.html')
     else:
         return render_template('userdashboard.html')

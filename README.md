@@ -19,6 +19,4 @@
 
 ### روش اتوماتیک (پیشنهادی)
 ```bash
-git clone https://github.com/itbity/IT-Bity-SSH-Panel.git
-cd IT-Bity-SSH-Panel
-sudo bash install.sh
+git clone https://github.com/itbity/IT-Bity-SSH-Panel.git && cd IT-Bity-SSH-Panel && sudo bash install.sh
