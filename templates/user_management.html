@@ -19,6 +19,10 @@
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
@@ -144,6 +148,12 @@
                         <i class="fas fa-user-shield"></i>
                         {{ _('Admins') }}
                     </button>
+                    <!-- NEW: Problematic filter -->
+                    <button class="filter-btn" data-filter="problematic">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        {{ _('Problematic') }}
+                        <span id="problemCount" class="badge bg-danger" style="margin-inline-start:6px; display:none;">0</span>
+                    </button>
                 </div>
             </div>
 
@@ -162,12 +172,15 @@
                                 <th>{{ _('Created') }}</th>
                                 <th>{{ _('Last Login') }}</th>
                                 <th>{{ _('Traffic') }}</th>
+                                <!-- NEW: Current connections -->
+                                <th>{{ _('Conns') }}</th>
                                 <th>{{ _('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="usersTableBody">
                             <tr>
-                                <td colspan="7" class="text-center">
+                                <!-- colspan updated to 8 to match new column -->
+                                <td colspan="8" class="text-center">
                                     <div class="loading">
                                         <i class="fas fa-spinner fa-spin"></i>
                                         {{ _('Loading users...') }}

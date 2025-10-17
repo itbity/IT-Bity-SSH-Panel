@@ -1,5 +1,25 @@
 /* User Management Page Styles */
 
+/* Fix content going under navbar/sidebar */
+.main-content {
+    margin-top: var(--navbar-height);
+    min-height: calc(100vh - var(--navbar-height));
+    background: var(--bg-secondary);
+    transition: margin-left 0.3s ease;
+    padding-top: 20px;
+}
+
+@media (min-width: 1024px) {
+    .main-content {
+        margin-left: var(--sidebar-width);
+    }
+    
+    [dir="rtl"] .main-content {
+        margin-left: 0;
+        margin-right: var(--sidebar-width);
+    }
+}
+
 /* Content Wrapper */
 .content-wrapper {
     max-width: 1400px;
@@ -19,22 +39,22 @@
     }
 }
 
-.main-content {
-    margin-top: var(--navbar-height);
-    min-height: calc(100vh - var(--navbar-height));
-    background: var(--bg-secondary);
-    transition: margin-left 0.3s ease;
-    padding-top: 20px; /* فاصله از بالا */
+/* Content Wrapper */
+.content-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 40px;
 }
 
-@media (min-width: 1024px) {
-    .main-content {
-        margin-left: var(--sidebar-width);
+@media (max-width: 1024px) {
+    .content-wrapper {
+        padding: 24px 30px;
     }
-    
-    [dir="rtl"] .main-content {
-        margin-left: 0;
-        margin-right: var(--sidebar-width);
+}
+
+@media (max-width: 767px) {
+    .content-wrapper {
+        padding: 20px;
     }
 }
 
