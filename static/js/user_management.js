@@ -43,14 +43,9 @@ async function loadUsers() {
       return;
     }
 
-    // 1) دریافت لیست
     allUsers = data.users || [];
-
-    // 2) آپدیت آمار و تعداد Problematic (بدون پاپ‌آپ)
     updateStats();
     updateProblemBadge();
-
-    // 3) رندر طبق فیلتر فعلی و سرچ
     filterUsers();
   } catch (err) {
     console.error('Error loading users:', err);
@@ -61,14 +56,13 @@ async function loadUsers() {
 function updateProblemBadge() {
   const el = document.getElementById('problemCount');
   if (!el) return;
-  const count = allUsers.filter(
-    (u) => !!u.problematic && u.role !== 'admin'
-  ).length;
+  const count = allUsers.filter((u) => !!u.problematic).length;
   el.textContent = String(count);
   el.style.display = count > 0 ? 'inline-block' : 'none';
 }
 
-// ---- Create User modal ----
+// ---------- Modals ----------
+
 function showAddUserModal() {
   const randomPass = generatePassword(16);
 
@@ -137,7 +131,6 @@ function showAddUserModal() {
         Swal.showValidationMessage('Username is required');
         return false;
       }
-
       return {
         username,
         password,
@@ -148,54 +141,32 @@ function showAddUserModal() {
       };
     },
   }).then((result) => {
-    if (result.isConfirmed) {
-      createUser(result.value);
-    }
+    if (result.isConfirmed) createUser(result.value);
   });
 }
 
 async function createUser(userData) {
   try {
-    Swal.fire({
-      title: 'Creating User...',
-      html: 'Please wait while we create the user',
-      allowOutsideClick: false,
-      didOpen: () => Swal.showLoading(),
-    });
-
-    const pathParts = window.location.pathname.split('/');
-    const panelPath = pathParts[1];
-
+    Swal.fire({ title: 'Creating User...', html: 'Please wait...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const panelPath = window.location.pathname.split('/')[1];
     const res = await fetch(`/${panelPath}/user_management/api/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData)
     });
-
     const data = await res.json();
-    if (!data.success) {
-      return Swal.fire({ icon: 'error', title: 'Error', text: data.message });
-    }
-
+    if (!data.success) return Swal.fire({ icon: 'error', title: 'Error', text: data.message });
     Swal.fire({
-      icon: 'success',
-      title: 'User Created!',
-      html: `
-        <div style="text-align:left;background:#f8f9fa;padding:15px;border-radius:8px;margin-top:15px;">
-          <p><strong>Username:</strong> ${data.user.username}</p>
-          <p><strong>Password:</strong> <code style="background:#e9ecef;padding:2px 6px;border-radius:4px;">${data.user.password}</code></p>
-          <p><strong>Expires:</strong> ${data.user.expires_at}</p>
-        </div>
-        <p style="color:#dc3545;margin-top:15px;"><i class="fas fa-exclamation-triangle"></i> Save these credentials!</p>
-      `,
-      confirmButtonText: 'OK',
+      icon: 'success', title: 'User Created!',
+      html: `<div style="text-align:left;background:#f8f9fa;padding:15px;border-radius:8px;margin-top:15px;">
+               <p><strong>Username:</strong> ${data.user.username}</p>
+               <p><strong>Password:</strong> <code style="background:#e9ecef;padding:2px 6px;border-radius:4px;">${data.user.password}</code></p>
+               <p><strong>Expires:</strong> ${data.user.expires_at}</p>
+             </div>`
     }).then(loadUsers);
   } catch (err) {
     Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to create user: ' + err.message });
   }
 }
 
-// ---- Edit user modal (username read-only فعلاً) ----
 function editUser(userId) {
   const user = allUsers.find((u) => u.id === userId);
   if (!user) return;
@@ -271,12 +242,9 @@ function editUser(userId) {
   }).then(async (result) => {
     if (!result.isConfirmed) return;
     try {
-      const pathParts = window.location.pathname.split('/');
-      const panelPath = pathParts[1];
+      const panelPath = window.location.pathname.split('/')[1];
       const res = await fetch(`/${panelPath}/user_management/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result.value),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result.value)
       });
       const data = await res.json();
       if (!data.success) return Swal.fire('Error', data.message, 'error');
@@ -288,7 +256,6 @@ function editUser(userId) {
   });
 }
 
-// ---- Reset password (uses PUT password) ----
 async function resetPassword(userId) {
   const user = allUsers.find((u) => u.id === userId);
   if (!user) return;
@@ -305,13 +272,9 @@ async function resetPassword(userId) {
   }).then(async (result) => {
     if (!result.isConfirmed) return;
     try {
-      const pathParts = window.location.pathname.split('/');
-      const panelPath = pathParts[1];
-
+      const panelPath = window.location.pathname.split('/')[1];
       const res = await fetch(`/${panelPath}/user_management/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: newPassword })
       });
       const data = await res.json();
       if (!data.success) return Swal.fire('Error', data.message, 'error');
@@ -327,7 +290,75 @@ async function resetPassword(userId) {
   });
 }
 
-// ---- Repair (always available) ----
+// ---------- Linux-only actions ----------
+
+async function importLinuxUser(username) {
+  Swal.fire({
+    title: 'Import Linux User?',
+    html: `This will create a DB user for <strong>${username}</strong> with default limits and set a new password.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Import',
+    cancelButtonText: 'Cancel',
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const panelPath = window.location.pathname.split('/')[1];
+      const res = await fetch(`/${panelPath}/user_management/api/users/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_linux_user', username })
+      });
+      const data = await res.json();
+      if (!data.success) return Swal.fire('Error', data.message, 'error');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Imported!',
+        html: `
+          <div style="text-align:left;background:#f8f9fa;padding:15px;border-radius:8px;margin-top:15px;">
+            <p><strong>Username:</strong> ${data.user.username}</p>
+            <p><strong>Password:</strong> <code style="background:#e9ecef;padding:2px 6px;border-radius:4px;">${data.user.password}</code></p>
+            <p><strong>Expires:</strong> ${data.user.expires_at}</p>
+          </div>
+          <p style="color:#dc3545;margin-top:15px;"><i class="fas fa-exclamation-triangle"></i> Save these credentials!</p>
+        `
+      }).then(loadUsers);
+    } catch (err) {
+      Swal.fire('Error', 'Failed to import user', 'error');
+    }
+  });
+}
+
+async function deleteLinuxOnly(username) {
+  Swal.fire({
+    title: 'Delete Linux User?',
+    html: `This will remove <strong>${username}</strong> from the OS (not in DB).`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    confirmButtonText: 'Delete',
+    cancelButtonText: 'Cancel',
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const panelPath = window.location.pathname.split('/')[1];
+      const res = await fetch(`/${panelPath}/user_management/api/users/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clean_orphans' })
+      });
+      const data = await res.json();
+      if (!data.success) return Swal.fire('Error', data.message, 'error');
+      Swal.fire('Deleted!', 'Linux user removed if orphaned', 'success').then(loadUsers);
+    } catch (err) {
+      Swal.fire('Error', 'Failed to delete linux user', 'error');
+    }
+  });
+}
+
+// ---------- DB-only repair ----------
+
 async function repairUser(userId) {
   const user = allUsers.find((u) => u.id === userId);
   if (!user) return;
@@ -342,15 +373,12 @@ async function repairUser(userId) {
   }).then(async (result) => {
     if (!result.isConfirmed) return;
     try {
-      const pathParts = window.location.pathname.split('/');
-      const panelPath = pathParts[1];
-
+      const panelPath = window.location.pathname.split('/')[1];
       const res = await fetch(`/${panelPath}/user_management/api/users/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'repair_user', user_id: userId }),
+        body: JSON.stringify({ action: 'repair_user', user_id: userId })
       });
-
       const data = await res.json();
       if (!data.success) return Swal.fire('Error', data.message, 'error');
 
@@ -368,7 +396,6 @@ async function repairUser(userId) {
   });
 }
 
-// ---- Delete ----
 function deleteUser(userId) {
   const user = allUsers.find((u) => u.id === userId);
   if (!user) return;
@@ -385,12 +412,8 @@ function deleteUser(userId) {
   }).then(async (result) => {
     if (!result.isConfirmed) return;
     try {
-      const pathParts = window.location.pathname.split('/');
-      const panelPath = pathParts[1];
-
-      const res = await fetch(`/${panelPath}/user_management/api/users/${userId}`, {
-        method: 'DELETE',
-      });
+      const panelPath = window.location.pathname.split('/')[1];
+      const res = await fetch(`/${panelPath}/user_management/api/users/${userId}`, { method: 'DELETE' });
       const data = await res.json();
       if (!data.success) return Swal.fire('Error', data.message, 'error');
 
@@ -402,19 +425,18 @@ function deleteUser(userId) {
   });
 }
 
-// ---- Helpers ----
+// ---------- Rendering & Filters ----------
+
 function generatePassword(length) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
   let password = '';
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  for (let i = 0; i < length; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
   return password;
 }
 
 function updateStats() {
-  const total = allUsers.filter((u) => u.role !== 'admin').length;
-  const active = allUsers.filter((u) => u.is_active && u.role !== 'admin').length;
+  const total = allUsers.filter((u) => u.role !== 'admin' || u.linux_only).length; // شمارش شامل linux-only
+  const active = allUsers.filter((u) => u.is_active && !u.linux_only && u.role !== 'admin').length;
   const inactive = total - active;
   const admins = allUsers.filter((u) => u.role === 'admin').length;
 
@@ -429,20 +451,20 @@ function filterUsers() {
   let filtered = [...allUsers];
 
   if (currentFilter === 'active') {
-    filtered = filtered.filter((u) => u.is_active && u.role !== 'admin');
+    filtered = filtered.filter((u) => u.is_active && !u.linux_only && u.role !== 'admin');
   } else if (currentFilter === 'inactive') {
-    filtered = filtered.filter((u) => !u.is_active && u.role !== 'admin');
+    filtered = filtered.filter((u) => !u.is_active && !u.linux_only && u.role !== 'admin');
   } else if (currentFilter === 'admin') {
     filtered = filtered.filter((u) => u.role === 'admin');
   } else if (currentFilter === 'problematic') {
-    filtered = filtered.filter((u) => !!u.problematic && u.role !== 'admin');
+    filtered = filtered.filter((u) => !!u.problematic); // شامل DB-only و Linux-only
   }
 
   if (searchTerm) {
     filtered = filtered.filter(
       (u) =>
-        u.username.toLowerCase().includes(searchTerm) ||
-        u.role.toLowerCase().includes(searchTerm)
+        (u.username || '').toLowerCase().includes(searchTerm) ||
+        (u.role || '').toLowerCase().includes(searchTerm)
     );
   }
 
@@ -461,107 +483,107 @@ function displayUsers(users) {
             <p>No users found</p>
           </div>
         </td>
-      </tr>
-    `;
+      </tr>`;
     return;
   }
 
   tbody.innerHTML = users
     .map((user) => {
-      const isAdmin = user.role === 'admin';
+      const isAdmin = user.role === 'admin' && !user.linux_only;
       const problematic = !!user.problematic;
+      const isLinuxOnly = !!user.linux_only;
+
+      const trafficCell = isAdmin
+        ? '<span style="color:var(--text-secondary);">N/A</span>'
+        : user.limits
+        ? `
+          <div style="font-size:12px;">
+            <div>${user.limits.traffic_used_gb} / ${user.limits.traffic_limit_gb} GB</div>
+            <div style="margin-top:4px;background:var(--bg-secondary);height:6px;border-radius:3px;overflow:hidden;">
+              <div style="width:${Math.min((user.limits.traffic_used_gb / user.limits.traffic_limit_gb) * 100, 100)}%;height:100%;background:${getTrafficColor(user.limits.traffic_used_gb, user.limits.traffic_limit_gb)};"></div>
+            </div>
+            ${user.limits.expires_at ? `<div style="margin-top:4px;color:var(--text-secondary);">Expires: ${user.limits.expires_at}</div>` : ''}
+          </div>`
+        : isLinuxOnly
+        ? '<span style="color:var(--text-secondary);">N/A</span>'
+        : '-';
+
+      const connsCell = isAdmin
+        ? '<span style="color:var(--text-secondary);">N/A</span>'
+        : `${user.current_connections ?? 0} / ${user.max_connections ?? '-'}`;
+
+      // actions
+      let actions = '';
+      if (isLinuxOnly) {
+        actions = `
+          <button class="btn-action edit" onclick="importLinuxUser('${user.username}')" title="Import to DB">
+            <i class="fas fa-download"></i>
+          </button>
+          <button class="btn-action delete" onclick="deleteLinuxOnly('${user.username}')" title="Delete (Linux)">
+            <i class="fas fa-trash"></i>
+          </button>
+        `;
+      } else if (!isAdmin) {
+        actions = `
+          <button class="btn-action edit" onclick="editUser(${user.id})" title="Edit">
+            <i class="fas fa-edit"></i>
+          </button>
+          ${
+            user.sync_status && !user.sync_status.synced
+              ? `<button class="btn-action repair" onclick="repairUser(${user.id})" title="Repair User">
+                   <i class="fas fa-wrench"></i>
+                 </button>`
+              : ''
+          }
+          <button class="btn-action reset" onclick="resetPassword(${user.id})" title="Reset Password">
+            <i class="fas fa-key"></i>
+          </button>
+          <button class="btn-action delete" onclick="deleteUser(${user.id})" title="Delete">
+            <i class="fas fa-trash"></i>
+          </button>`;
+      } else {
+        actions = `
+          <button class="btn-action view" onclick="editUser(${user.id})" title="View">
+            <i class="fas fa-eye"></i>
+          </button>`;
+      }
 
       return `
       <tr ${problematic ? 'style="background: rgba(239,68,68,.06)"' : ''}>
         <td>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:36px;height:36px;border-radius:8px;background:${getRoleColor(
-              user.role
-            )};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;">
-              ${user.username?.charAt(0)?.toUpperCase() || '?'}
+            <div style="width:36px;height:36px;border-radius:8px;background:${getRoleColor(user.role)};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;">
+              ${(user.username || '?').charAt(0).toUpperCase()}
             </div>
             <div>
               <strong>${user.username}</strong>
-              ${problematic ? '<br><span style="font-size:11px;color:#ef4444;"><i class="fas fa-exclamation-triangle"></i> Problematic</span>' : ''}
-              ${
-                user.sync_status && !user.sync_status.synced
-                  ? '<br><span style="font-size:11px;color:#ef4444;"><i class="fas fa-link-slash"></i> Out of sync</span>'
-                  : ''
-              }
+              ${isLinuxOnly ? '<br><span style="font-size:11px;color:#ef4444;"><i class="fas fa-circle-exclamation"></i> Linux-only (not in DB)</span>' : ''}
+              ${!isLinuxOnly && user.sync_status && !user.sync_status.synced ? '<br><span style="font-size:11px;color:#ef4444;"><i class="fas fa-link-slash"></i> Not in Linux</span>' : ''}
+              ${problematic ? '<br><span style="font-size:11px;color:#ef4444;"><i class="fas fa-triangle-exclamation"></i> Problematic</span>' : ''}
             </div>
           </div>
         </td>
         <td>
           <span class="badge badge-${user.role}">
             <i class="fas fa-${isAdmin ? 'user-shield' : 'user'}"></i>
-            ${user.role}
+            ${user.role}${isLinuxOnly ? ' (orphan)' : ''}
           </span>
         </td>
         <td>
-          <span class="badge badge-${user.is_active && !user?.limits?.is_expired ? 'active' : 'inactive'}">
-            <i class="fas fa-${user.is_active && !user?.limits?.is_expired ? 'check-circle' : 'times-circle'}"></i>
-            ${user?.limits?.is_expired ? 'Expired' : user.is_active ? 'Active' : 'Inactive'}
-          </span>
-        </td>
-        <td>${user.created_at}</td>
-        <td>${user.last_login}</td>
-        <td>
           ${
-            isAdmin
-              ? '<span style="color:var(--text-secondary);">N/A</span>'
-              : user.limits
-              ? `
-              <div style="font-size:12px;">
-                <div>${user.limits.traffic_used_gb} / ${user.limits.traffic_limit_gb} GB</div>
-                <div style="margin-top:4px;background:var(--bg-secondary);height:6px;border-radius:3px;overflow:hidden;">
-                  <div style="width:${Math.min(
-                    (user.limits.traffic_used_gb / user.limits.traffic_limit_gb) * 100,
-                    100
-                  )}%;height:100%;background:${getTrafficColor(
-                  user.limits.traffic_used_gb,
-                  user.limits.traffic_limit_gb
-                )};"></div>
-                </div>
-                ${
-                  user.limits.expires_at
-                    ? `<div style="margin-top:4px;color:var(--text-secondary);">Expires: ${user.limits.expires_at}</div>`
-                    : ''
-                }
-              </div>`
-              : '-'
+            isLinuxOnly
+              ? '<span class="badge badge-inactive"><i class="fas fa-times-circle"></i> Not in DB</span>'
+              : `<span class="badge badge-${user.is_active && !user?.limits?.is_expired ? 'active' : 'inactive'}">
+                   <i class="fas fa-${user.is_active && !user?.limits?.is_expired ? 'check-circle' : 'times-circle'}"></i>
+                   ${user?.limits?.is_expired ? 'Expired' : user.is_active ? 'Active' : 'Inactive'}
+                 </span>`
           }
         </td>
-        <td>
-          ${
-            isAdmin
-              ? '<span style="color:var(--text-secondary);">N/A</span>'
-              : `${user.current_connections ?? 0} / ${user.max_connections ?? '-'}`
-          }
-        </td>
-        <td>
-          <div class="action-buttons">
-            <button class="btn-action edit" onclick="editUser(${user.id})" title="Edit">
-              <i class="fas fa-edit"></i>
-            </button>
-            ${
-              !isAdmin
-                ? `
-              <button class="btn-action reset" onclick="resetPassword(${user.id})" title="Reset Password">
-                <i class="fas fa-key"></i>
-              </button>
-              <button class="btn-action repair" onclick="repairUser(${user.id})" title="Repair User">
-                <i class="fas fa-wrench"></i>
-              </button>
-              <button class="btn-action delete" onclick="deleteUser(${user.id})" title="Delete">
-                <i class="fas fa-trash"></i>
-              </button>`
-                : `
-              <button class="btn-action view" onclick="editUser(${user.id})" title="View">
-                <i class="fas fa-eye"></i>
-              </button>`
-            }
-          </div>
-        </td>
+        <td>${isLinuxOnly ? '-' : user.created_at}</td>
+        <td>${isLinuxOnly ? '-' : user.last_login}</td>
+        <td>${trafficCell}</td>
+        <td>${connsCell}</td>
+        <td><div class="action-buttons">${actions}</div></td>
       </tr>`;
     })
     .join('');
@@ -574,9 +596,9 @@ function getRoleColor(role) {
 }
 
 function getTrafficColor(used, limit) {
-  const percentage = (used / (limit || 1)) * 100;
-  if (percentage >= 90) return '#ef4444';
-  if (percentage >= 75) return '#f59e0b';
+  const pct = (used / (limit || 1)) * 100;
+  if (pct >= 90) return '#ef4444';
+  if (pct >= 75) return '#f59e0b';
   return '#10b981';
 }
 
@@ -590,6 +612,5 @@ function showError(message) {
           <p>${message}</p>
         </div>
       </td>
-    </tr>
-  `;
+    </tr>`;
 }

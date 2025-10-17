@@ -48,7 +48,7 @@ def check_linux_user_exists(username):
 def get_current_connections(username):
     """Return current concurrent SSH connections for the user (placeholder)."""
     try:
-        # TODO: implement using `ss -tp | grep 'ssh'` or logs
+        # TODO: implement via `ss -tp`/logs; for now 0
         return 0
     except Exception:
         return 0
@@ -114,7 +114,6 @@ Match User {username}
             try:
                 subprocess.run(['sudo', 'systemctl', 'reload', 'sshd'], check=True)
             except subprocess.CalledProcessError:
-                # اگر هیچکدام از سرویس‌ها وجود ندارد، بی‌خیال
                 pass
         return True, "User created successfully"
     except subprocess.CalledProcessError as e:
@@ -155,15 +154,29 @@ def users_page():
 @login_required
 @admin_required
 def get_users():
+    """
+    برمی‌گرداند:
+      - تمام کاربران دیتابیس + وضعیت لینوکسی‌شان
+      - همه‌ی Linux-only کاربران را به صورت ردیف‌های مصنوعی (linux_only=true)
+    """
     try:
         db_users = User.query.all()
         linux_users = get_all_linux_users()
 
-        users_data = []
-        for user in db_users:
-            linux_exists = check_linux_user_exists(user.username)
+        db_usernames = {u.username for u in db_users}
+        linux_usernames = set(linux_users)
 
-            # base object
+        users_data = []
+
+        # 1) کاربران دیتابیس
+        for user in db_users:
+            linux_exists = user.username in linux_usernames
+
+            current_conns = 0 if user.role == 'admin' else get_current_connections(user.username)
+            over_traffic = False
+            is_expired = False
+            max_conns = None
+
             user_data = {
                 'id': user.id,
                 'username': user.username,
@@ -172,13 +185,8 @@ def get_users():
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M'),
                 'last_login': user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else _('Never'),
                 'sync_status': {'in_database': True, 'in_linux': linux_exists, 'synced': linux_exists},
+                'linux_only': False
             }
-
-            # limits + live stats
-            current_conns = 0 if user.role == 'admin' else get_current_connections(user.username)
-            over_traffic = False
-            is_expired = False
-            max_conns = None
 
             if user.limits:
                 current_traffic = get_user_traffic(user.username)
@@ -203,7 +211,7 @@ def get_users():
             user_data['current_connections'] = current_conns
             user_data['max_connections'] = max_conns
 
-            # precise problematic flag
+            # problematic: نبودن در لینوکس یا محدودیت‌ها
             user_data['problematic'] = (
                 (not linux_exists) or
                 (user.role != 'admin' and (
@@ -215,9 +223,28 @@ def get_users():
 
             users_data.append(user_data)
 
-        # still return orphans for potential manual tools, but JS won't popup
-        db_usernames = [u.username for u in db_users]
-        orphaned_linux_users = [u for u in linux_users if u not in db_usernames]
+        # 2) Linux-only: هر کاربر لینوکسی که در DB نیست => ردیف مصنوعی
+        linux_only_users = sorted(list(linux_usernames - db_usernames))
+        for lx in linux_only_users:
+            # ادمین لینوکسیِ هم‌نام با admin DB نداریم؛ اگر بود هم به عنوان لینوکسی ساده می‌آید
+            current_conns = get_current_connections(lx)
+            users_data.append({
+                'id': None,
+                'username': lx,
+                'role': 'user',
+                'is_active': True,
+                'created_at': '-',
+                'last_login': '-',
+                'sync_status': {'in_database': False, 'in_linux': True, 'synced': False},
+                'limits': None,
+                'current_connections': current_conns,
+                'max_connections': None,
+                'linux_only': True,        # مهم برای کلاینت
+                'problematic': True        # حتماً مشکل‌دار محسوب شود
+            })
+
+        # همچنان لیست یتیم‌ها را برمی‌گردانیم، اما UI پاپ‌آپ نمی‌دهد
+        orphaned_linux_users = linux_only_users
 
         return jsonify({'success': True, 'users': users_data, 'orphaned_linux_users': orphaned_linux_users})
     except Exception as e:
@@ -227,9 +254,16 @@ def get_users():
 @login_required
 @admin_required
 def sync_users():
+    """
+    اکشن‌ها:
+      - repair_all: ساخت کاربران DB-only که در لینوکس نیستند
+      - repair_user: ساخت یک کاربر DB-only در لینوکس (و برگرداندن پسورد)
+      - clean_orphans: حذف Linux-only ها از سیستم
+      - import_linux_user: وارد کردن Linux-only به دیتابیس (ست کردن پسورد جدید روی لینوکس + ساخت رکورد DB)
+    """
     try:
         data = request.get_json() or {}
-        action = data.get('action')  # 'repair_all', 'repair_user', 'clean_orphans'
+        action = data.get('action')
 
         if action == 'repair_all':
             users = User.query.filter(User.role != 'admin').all()
@@ -237,8 +271,8 @@ def sync_users():
             for user in users:
                 if not check_linux_user_exists(user.username):
                     password = generate_random_password()
-                    success, _ = create_linux_user(user.username, password)
-                    if success:
+                    ok, _ = create_linux_user(user.username, password)
+                    if ok:
                         repaired += 1
             return jsonify({'success': True, 'message': f'Repaired {repaired} users'})
 
@@ -247,10 +281,10 @@ def sync_users():
             user = User.query.get_or_404(user_id)
             if not check_linux_user_exists(user.username):
                 password = generate_random_password()
-                success, message = create_linux_user(user.username, password)
-                if success:
+                ok, msg = create_linux_user(user.username, password)
+                if ok:
                     return jsonify({'success': True, 'message': 'User repaired', 'password': password})
-                return jsonify({'success': False, 'message': message}), 500
+                return jsonify({'success': False, 'message': msg}), 500
             else:
                 return jsonify({'success': True, 'message': 'User already exists in Linux'})
 
@@ -260,13 +294,52 @@ def sync_users():
             orphans = [u for u in linux_users if u not in db_usernames]
             cleaned = 0
             for username in orphans:
-                success, _ = delete_linux_user(username)
-                if success:
+                ok, _ = delete_linux_user(username)
+                if ok:
                     cleaned += 1
             return jsonify({'success': True, 'message': f'Cleaned {cleaned} orphaned users'})
 
+        elif action == 'import_linux_user':
+            username = (data.get('username') or '').strip()
+            if not username:
+                return jsonify({'success': False, 'message': 'username is required'}), 400
+
+            # باید در لینوکس باشد و در DB نباشد
+            if not check_linux_user_exists(username):
+                return jsonify({'success': False, 'message': 'Linux user not found'}), 404
+            if User.query.filter_by(username=username).first():
+                return jsonify({'success': False, 'message': 'User already exists in database'}), 400
+
+            # پسورد جدید بساز و روی لینوکس ست کن تا ادمین credential داشته باشد
+            new_password = generate_random_password()
+            ok, msg = reset_linux_password(username, new_password)
+            if not ok:
+                return jsonify({'success': False, 'message': msg}), 500
+
+            # ساخت رکورد DB + limits پیش‌فرض
+            new_user = User(username=username, role='user', is_active=True)
+            new_user.set_password(new_password)
+            db.session.add(new_user)
+            db.session.flush()
+
+            expires_at = datetime.utcnow() + timedelta(days=30)
+            limits = UserLimit(user_id=new_user.id,
+                               traffic_limit_gb=50,
+                               traffic_used_gb=0.0,
+                               max_connections=2,
+                               download_speed_mbps=0,
+                               expires_at=expires_at)
+            db.session.add(limits)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Linux user imported to DB',
+                            'user': {'id': new_user.id, 'username': username,
+                                     'password': new_password,
+                                     'expires_at': expires_at.strftime('%Y-%m-%d')}})
+
         return jsonify({'success': False, 'message': 'Invalid action'}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @user_management_bp.route('/api/users', methods=['POST'])
@@ -322,7 +395,7 @@ def update_user(user_id):
         user = User.query.get_or_404(user_id)
         data = request.get_json() or {}
 
-        # optional username change (disabled در UI فعلاً، ولی آماده)
+        # optional username change (UI فعلاً disabled)
         if 'username' in data:
             new_username = data['username'].strip()
             if new_username and new_username != user.username:
@@ -334,7 +407,6 @@ def update_user(user_id):
                         return jsonify({'success': False, 'message': msg}), 500
                 user.username = new_username
 
-        # password reset
         if 'password' in data and data['password']:
             ok, msg = reset_linux_password(user.username, data['password'])
             if not ok:
