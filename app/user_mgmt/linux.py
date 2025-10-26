@@ -72,15 +72,17 @@ def create_linux_user(username: str, password: str):
         proc = subprocess.Popen([SUDO_PATH, "chpasswd"], stdin=subprocess.PIPE, text=True)
         proc.communicate(f"{username}:{password}")
 
-        # 3️⃣ Generate SSHD rule
+        # 3️⃣ Generate SSHD rule (VPN/tunnel-only, no shell)
         ssh_config = f"""
 Match User {username}
     PermitTunnel yes
     AllowTcpForwarding yes
     X11Forwarding no
     AllowAgentForwarding no
-    ForceCommand /bin/false
+    PermitTTY no
+    ForceCommand internal-sftp
 """
+
         tmp_file = f"/tmp/ssh_user_{username}.conf"
         with open(tmp_file, "w") as f:
             f.write(ssh_config)
