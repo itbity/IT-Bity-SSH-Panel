@@ -87,6 +87,28 @@ fi
 echo -e "${GREEN}[5/14] Installing Python and dependencies...${NC}"
 apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config libssl-dev libffi-dev
 
+echo -e "${GREEN}[5.1/14] Installing network monitoring tools...${NC}"
+apt install -y nethogs vnstat iftop conntrack iptables-persistent
+
+# Enable vnstat service (for interface traffic persistence)
+systemctl enable vnstat
+systemctl start vnstat
+
+# Verify installation
+for cmd in nethogs vnstat iftop conntrack; do
+    if command -v $cmd >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ $cmd installed successfully${NC}"
+    else
+        echo -e "${RED}✗ $cmd installation failed${NC}"
+    fi
+done
+
+# ✅ Add sudo permission for traffic tools
+echo -e "${GREEN}Granting sudo permissions for www-data...${NC}"
+if ! grep -q "www-data ALL=(ALL) NOPASSWD: /usr/sbin/nethogs, /usr/sbin/conntrack" /etc/sudoers; then
+    echo "www-data ALL=(ALL) NOPASSWD: /usr/sbin/nethogs, /usr/sbin/conntrack" >> /etc/sudoers
+fi
+
 echo -e "${GREEN}[6/14] Installing Nginx...${NC}"
 apt install -y nginx
 
