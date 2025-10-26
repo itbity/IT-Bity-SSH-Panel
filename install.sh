@@ -88,6 +88,12 @@ echo -e "${GREEN}[5/14] Installing Python and dependencies...${NC}"
 apt install -y python3 python3-pip python3-venv python3-dev libmariadb-dev build-essential pkg-config libssl-dev libffi-dev
 
 echo -e "${GREEN}[5.1/14] Installing network monitoring tools...${NC}"
+
+export DEBIAN_FRONTEND=noninteractive
+echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+
+# Install all monitoring tools non-interactively
 apt install -y nethogs vnstat iftop conntrack iptables-persistent
 
 # Enable vnstat service (for interface traffic persistence)
