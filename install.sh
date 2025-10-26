@@ -118,6 +118,32 @@ fi
 echo -e "${GREEN}[6/14] Installing Nginx...${NC}"
 apt install -y nginx
 
+echo -e "${GREEN}[6.1/14] Configuring sudo permissions for www-data...${NC}"
+
+cat > /etc/sudoers.d/itbity-panel <<'EOF'
+# ITBity Panel restricted sudo permissions for www-data
+www-data ALL=(ALL) NOPASSWD: \
+    /usr/sbin/useradd, \
+    /usr/sbin/userdel, \
+    /usr/sbin/usermod, \
+    /usr/sbin/chpasswd, \
+    /usr/bin/systemctl reload ssh, \
+    /usr/bin/systemctl reload sshd, \
+    /usr/bin/tee -a /etc/ssh/sshd_config, \
+    /usr/bin/rm -f /tmp/ssh_user_*.conf, \
+    /usr/bin/pkill -KILL -u *
+EOF
+
+chmod 440 /etc/sudoers.d/itbity-panel
+
+if visudo -c >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ Sudoers file validated successfully${NC}"
+else
+    echo -e "${RED}✗ Invalid sudoers file! Aborting installation.${NC}"
+    rm -f /etc/sudoers.d/itbity-panel
+    exit 1
+fi
+
 echo -e "${GREEN}[7/14] Setting up project directory...${NC}"
 mkdir -p $PROJECT_DIR
 echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
