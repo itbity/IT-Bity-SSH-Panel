@@ -313,6 +313,9 @@ pip install gunicorn
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 PANEL_PATH=$(python3 -c "import secrets; print(secrets.token_hex(16))")
 
+echo -e "${GREEN}[9.1/14] Installing system-wide Python packages for PAM...${NC}"
+pip3 install pymysql --break-system-packages
+
 echo -e "${GREEN}[10/14] Creating .env file...${NC}"
 cat > $PROJECT_DIR/.env << EOF
 SECRET_KEY='$SECRET_KEY'
