@@ -314,7 +314,15 @@ SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 PANEL_PATH=$(python3 -c "import secrets; print(secrets.token_hex(16))")
 
 echo -e "${GREEN}[9.1/14] Installing system-wide Python packages for PAM...${NC}"
-pip3 install pymysql --break-system-packages
+apt install -y python3-pymysql
+
+# Verify installation
+if python3 -c "import pymysql" 2>/dev/null; then
+    echo -e "${GREEN}✓ pymysql installed successfully${NC}"
+else
+    echo -e "${RED}✗ pymysql installation failed${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}[10/14] Creating .env file...${NC}"
 cat > $PROJECT_DIR/.env << EOF
