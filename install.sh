@@ -227,12 +227,36 @@ def get_user_limit(username):
 
 def count_user_sessions(username):
     try:
-        result = subprocess.run(['who'], capture_output=True, text=True, timeout=5)
+        import re
+        
+        result = subprocess.run(
+            ['ss', '-tnp', 'state', 'established', '( sport = :22 )'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
         if result.returncode != 0:
             return 0
         
-        sessions = [line for line in result.stdout.split('\n') if line.startswith(username)]
-        return len(sessions)
+        pids = re.findall(r'pid=(\d+)', result.stdout)
+        
+        count = 0
+        for pid in set(pids):
+            try:
+                ps_result = subprocess.run(
+                    ['ps', '-o', 'user=', '-p', pid],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                if ps_result.returncode == 0 and ps_result.stdout.strip() == username:
+                    count += 1
+            except:
+                continue
+        
+        return count
+        
     except Exception as e:
         log_message(f"ERROR: Failed to count sessions: {e}")
         return 0

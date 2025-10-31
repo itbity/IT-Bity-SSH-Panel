@@ -10,7 +10,7 @@ class NullConnections(ConnectionsProvider):
         return 0
 
 class WhoConnections(ConnectionsProvider):
-    """Get current SSH connections using 'who' command"""
+    """Get current SSH connections using 'who' command (works only with shell sessions)"""
     
     def get_current_connections(self, username: str) -> int:
         try:
@@ -23,20 +23,15 @@ class WhoConnections(ConnectionsProvider):
         except Exception as e:
             return 0
 
-class SsConnections(ConnectionsProvider):
-    """Get current SSH connections using 'ss' command (more accurate)"""
+class SsConnectionsImproved(ConnectionsProvider):
+    """Get current SSH connections using 'ss' with process info (most accurate for SFTP/tunnel users)"""
     
     def get_current_connections(self, username: str) -> int:
         try:
-            import pwd
-            try:
-                uid = pwd.getpwnam(username).pw_uid
-            except KeyError:
-                return 0
+            import re
             
-            # Count ESTABLISHED SSH connections for this specific user
             result = subprocess.run(
-                ['ss', '-Htn', 'state', 'established', 'sport', '=', ':22'],
+                ['ss', '-tnp', 'state', 'established', '( sport = :22 )'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -45,19 +40,27 @@ class SsConnections(ConnectionsProvider):
             if result.returncode != 0:
                 return 0
             
-            # Check /proc to match connections to UID
+            pids = re.findall(r'pid=(\d+)', result.stdout)
+            
             count = 0
-            for line in result.stdout.split('\n'):
-                if not line.strip():
+            for pid in set(pids):
+                try:
+                    ps_result = subprocess.run(
+                        ['ps', '-o', 'user=', '-p', pid],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if ps_result.returncode == 0 and ps_result.stdout.strip() == username:
+                        count += 1
+                except:
                     continue
-                # This is a simple count - for production you'd parse and verify UID
-                count += 1
             
             return count
         except Exception as e:
             return 0
 
-_provider: ConnectionsProvider = WhoConnections()
+_provider: ConnectionsProvider = SsConnectionsImproved()
 
 def set_connections_provider(provider: ConnectionsProvider) -> None:
     global _provider
