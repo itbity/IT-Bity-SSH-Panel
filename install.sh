@@ -144,6 +144,153 @@ else
     exit 1
 fi
 
+echo -e "${GREEN}[6.2/14] Configuring PAM for connection limits...${NC}"
+
+# Backup original sshd PAM file
+if [ ! -f /etc/pam.d/sshd.backup ]; then
+    cp /etc/pam.d/sshd /etc/pam.d/sshd.backup
+    echo -e "${GREEN}✓ Backup created: /etc/pam.d/sshd.backup${NC}"
+fi
+
+# Check if our line already exists
+if grep -q "check_user_limit.py" /etc/pam.d/sshd; then
+    echo -e "${YELLOW}⚠ PAM already configured, skipping...${NC}"
+else
+    # Create the connection limit check script
+    cat > /usr/local/bin/check_user_limit.py << 'LIMIT_SCRIPT'
+#!/usr/bin/env python3
+
+import os
+import sys
+import subprocess
+from datetime import datetime
+
+LOG_FILE = '/var/log/ssh_connection_limits.log'
+ENV_FILE = '/var/www/itbity-ssh-panel/.env'
+
+def log_message(message):
+    try:
+        with open(LOG_FILE, 'a') as f:
+            f.write(f"[{datetime.now()}] {message}\n")
+    except:
+        pass
+
+def load_env():
+    env_vars = {}
+    try:
+        with open(ENV_FILE, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    env_vars[key.strip()] = value.strip().strip("'\"")
+        return env_vars
+    except Exception as e:
+        log_message(f"ERROR: Failed to load .env: {e}")
+        return None
+
+def get_user_limit(username):
+    env = load_env()
+    if not env:
+        return None
+    
+    try:
+        import pymysql
+        
+        conn = pymysql.connect(
+            host=env.get('DB_HOST', 'localhost'),
+            user=env.get('DB_USER'),
+            password=env.get('DB_PASSWORD'),
+            database=env.get('DB_NAME'),
+            charset='utf8mb4'
+        )
+        
+        with conn.cursor() as cursor:
+            query = """
+                SELECT ul.max_connections 
+                FROM users u 
+                JOIN user_limits ul ON u.id = ul.user_id 
+                WHERE u.username = %s AND u.is_active = 1
+            """
+            cursor.execute(query, (username,))
+            result = cursor.fetchone()
+            
+            conn.close()
+            
+            if result:
+                return result[0]
+            return None
+            
+    except Exception as e:
+        log_message(f"ERROR: Database query failed: {e}")
+        return None
+
+def count_user_sessions(username):
+    try:
+        result = subprocess.run(['who'], capture_output=True, text=True, timeout=5)
+        if result.returncode != 0:
+            return 0
+        
+        sessions = [line for line in result.stdout.split('\n') if line.startswith(username)]
+        return len(sessions)
+    except Exception as e:
+        log_message(f"ERROR: Failed to count sessions: {e}")
+        return 0
+
+def main():
+    username = os.environ.get('PAM_USER')
+    
+    if not username:
+        log_message("ERROR: PAM_USER not found")
+        sys.exit(0)
+    
+    max_connections = get_user_limit(username)
+    
+    if max_connections is None:
+        log_message(f"INFO: No limit configured for user '{username}', allowing login")
+        sys.exit(0)
+    
+    current_sessions = count_user_sessions(username)
+    
+    log_message(f"USER: {username}, CURRENT: {current_sessions}, MAX: {max_connections}")
+    
+    if current_sessions >= max_connections:
+        print("=" * 70)
+        print("CONNECTION LIMIT REACHED!")
+        print(f"Maximum connections allowed: {max_connections}")
+        print(f"Current active connections: {current_sessions}")
+        print("Please disconnect one session or contact your administrator.")
+        print("=" * 70)
+        log_message(f"DENIED: {username} reached limit ({current_sessions}/{max_connections})")
+        sys.exit(1)
+    else:
+        log_message(f"ALLOWED: {username} connection ({current_sessions + 1}/{max_connections})")
+        sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+LIMIT_SCRIPT
+
+    chmod +x /usr/local/bin/check_user_limit.py
+    chown root:root /usr/local/bin/check_user_limit.py
+    
+    touch /var/log/ssh_connection_limits.log
+    chmod 666 /var/log/ssh_connection_limits.log
+    
+    echo -e "${GREEN}✓ Connection limit script created${NC}"
+    
+    sed -i '/^@include common-account/a # ITBity Panel - Check user connection limit\naccount    required     pam_exec.so /usr/local/bin/check_user_limit.py' /etc/pam.d/sshd
+    
+    if grep -q "check_user_limit.py" /etc/pam.d/sshd; then
+        echo -e "${GREEN}✓ PAM configured successfully${NC}"
+    else
+        echo -e "${RED}✗ Failed to configure PAM${NC}"
+        echo -e "${YELLOW}Restoring backup...${NC}"
+        cp /etc/pam.d/sshd.backup /etc/pam.d/sshd
+        exit 1
+    fi
+fi
+
 echo -e "${GREEN}[7/14] Setting up project directory...${NC}"
 mkdir -p $PROJECT_DIR
 echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
@@ -455,6 +602,12 @@ echo -e "${BLUE}Configuration File:${NC}"
 echo -e "  Location: ${YELLOW}${PROJECT_DIR}/.env${NC}"
 echo -e "  View credentials: ${YELLOW}cat ${PROJECT_DIR}/.env${NC}"
 echo ""
+echo -e "${BLUE}SSH Connection Limits:${NC}"
+echo -e "  Limit script: ${YELLOW}/usr/local/bin/check_user_limit.py${NC}"
+echo -e "  Limit logs:   ${YELLOW}tail -f /var/log/ssh_connection_limits.log${NC}"
+echo -e "  PAM config:   ${YELLOW}/etc/pam.d/sshd${NC}"
+echo -e "  PAM backup:   ${YELLOW}/etc/pam.d/sshd.backup${NC}"
+echo ""
 echo -e "${RED}⚠️  CRITICAL SECURITY WARNINGS:${NC}"
 echo "  1. Change admin password IMMEDIATELY after first login"
 echo "  2. Save the panel URL (it's randomly generated and won't be shown again)"
@@ -488,6 +641,7 @@ echo -e "${GREEN}✓${NC} Python environment configured"
 echo -e "${GREEN}✓${NC} Nginx reverse proxy configured"
 echo -e "${GREEN}✓${NC} Systemd service running"
 echo -e "${GREEN}✓${NC} Firewall configured (SSH, HTTP, HTTPS)"
+echo -e "${GREEN}✓${NC} PAM connection limits configured"
 echo ""
 echo -e "${YELLOW}Save these credentials before closing this terminal!${NC}"
 echo "========================================"
