@@ -31,7 +31,7 @@ class SsConnectionsImproved(ConnectionsProvider):
             import re
             
             result = subprocess.run(
-                ['ss', '-tnp', 'state', 'established', '( sport = :22 )'],
+                ['/usr/bin/sudo', '/usr/bin/ss', '-tnp', 'state', 'established', '( sport = :22 )'],
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -46,7 +46,7 @@ class SsConnectionsImproved(ConnectionsProvider):
             for pid in set(pids):
                 try:
                     ps_result = subprocess.run(
-                        ['ps', '-o', 'user=', '-p', pid],
+                        ['/usr/bin/ps', '-o', 'user=', '-p', pid],
                         capture_output=True,
                         text=True,
                         timeout=2
