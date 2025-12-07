@@ -322,6 +322,123 @@ LIMIT_SCRIPT
     fi
 fi
 
+echo -e "${GREEN}[6.3/14] Configuring PAM for traffic session tracking...${NC}"
+
+# Create traffic session registration script
+cat > /usr/local/bin/register_session.py << 'TRAFFIC_SCRIPT'
+#!/usr/bin/env python3
+
+import os
+import sys
+from datetime import datetime
+
+LOG_FILE = '/var/log/ssh_session_register.log'
+ENV_FILE = '/var/www/itbity-ssh-panel/.env'
+
+
+def log(msg):
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{datetime.now()}] {msg}\n")
+    except Exception:
+        pass
+
+
+def load_env():
+    env = {}
+    try:
+        with open(ENV_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                env[key.strip()] = value.strip().strip("'\"")
+    except Exception as e:
+        log(f"Failed to load .env: {e}")
+    return env
+
+
+def create_session(username, ip):
+    env = load_env()
+    if not env:
+        log("No env loaded, skipping DB insert")
+        return
+
+    try:
+        import pymysql
+
+        conn = pymysql.connect(
+            host=env.get("DB_HOST", "localhost"),
+            user=env.get("DB_USER"),
+            password=env.get("DB_PASSWORD"),
+            database=env.get("DB_NAME"),
+            charset="utf8mb4",
+        )
+        cur = conn.cursor()
+
+        # Find user id
+        cur.execute("SELECT id FROM users WHERE username=%s", (username,))
+        row = cur.fetchone()
+        if not row:
+            log(f"User not found in DB: {username}")
+            conn.close()
+            return
+
+        user_id = row[0]
+
+        # Very simple unique identifiers
+        ts = int(datetime.utcnow().timestamp())
+        session_id = f"{username}-{ts}"
+        nft_rule_name = f"traffic_{username}_{ts}"
+
+        cur.execute(
+            """
+            INSERT INTO user_ip_sessions
+                (user_id, ip_address, session_id, nft_rule_name, created_at)
+            VALUES
+                (%s, %s, %s, %s, NOW())
+            """,
+            (user_id, ip, session_id, nft_rule_name),
+        )
+        conn.commit()
+        conn.close()
+
+        log(f"Registered session for {username} from {ip} (session_id={session_id})")
+    except Exception as e:
+        log(f"DB ERROR: {e}")
+
+
+def main():
+    username = os.environ.get("PAM_USER")
+    ip = os.environ.get("PAM_RHOST")
+
+    if not username or not ip:
+        log(f"Missing PAM_USER or PAM_RHOST (user={username}, ip={ip})")
+        sys.exit(0)
+
+    create_session(username, ip)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
+TRAFFIC_SCRIPT
+
+chmod +x /usr/local/bin/register_session.py
+chown root:root /usr/local/bin/register_session.py
+
+touch /var/log/ssh_session_register.log
+chmod 666 /var/log/ssh_session_register.log
+
+# Add PAM session hook if not exists
+if ! grep -q "register_session.py" /etc/pam.d/sshd; then
+    sed -i '/^@include common-session/a # ITBity Panel - Register traffic session\nsession    required    pam_exec.so /usr/local/bin/register_session.py' /etc/pam.d/sshd
+fi
+
+echo -e "${GREEN}✓ PAM traffic session tracking configured${NC}"
+
+
 echo -e "${GREEN}[7/14] Setting up project directory...${NC}"
 mkdir -p $PROJECT_DIR
 echo "Copying files from $SCRIPT_DIR to $PROJECT_DIR..."
