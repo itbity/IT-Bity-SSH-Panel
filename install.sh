@@ -322,7 +322,31 @@ LIMIT_SCRIPT
     fi
 fi
 
-echo -e "${GREEN}[6.3/14] Configuring PAM for traffic session tracking...${NC}"
+echo -e "${GREEN}[6.3/14] Setting up NFTables for traffic accounting...${NC}"
+
+# Ensure nftables is installed
+apt install -y nftables
+
+# Enable nftables service
+systemctl enable nftables
+systemctl start nftables
+
+# Create traffic table if not exists
+if ! nft list tables 2>/dev/null | grep -q "itbity_traffic"; then
+    echo "Creating nftables table inet itbity_traffic..."
+    nft add table inet itbity_traffic
+fi
+
+# Create traffic chain if not exists
+if ! nft list chain inet itbity_traffic users >/dev/null 2>&1; then
+    echo "Creating nftables chain itbity_traffic users..."
+    nft add chain inet itbity_traffic users '{ type filter hook input priority 0; policy accept; }'
+fi
+
+echo -e "${GREEN}✓ NFTables traffic table & chain configured${NC}"
+
+
+echo -e "${GREEN}[6.4/14] Configuring PAM for traffic session tracking...${NC}"
 
 # Create traffic session registration script
 cat > /usr/local/bin/register_session.py << 'TRAFFIC_SCRIPT'
@@ -359,6 +383,28 @@ def load_env():
     return env
 
 
+def add_nft_rule(ip, rule_comment):
+    """Add nftables rule for this session IP with unique comment."""
+    try:
+        import subprocess
+        # Track incoming SSH traffic from that IP
+        # NOTE: We do not accept/deny here, only count.
+        subprocess.run(
+            [
+                "nft", "add", "rule",
+                "inet", "itbity_traffic", "users",
+                "ip", "saddr", ip,
+                "tcp", "dport", "22",
+                "counter",
+                "comment", rule_comment
+            ],
+            check=False,
+            timeout=2
+        )
+    except Exception as e:
+        log(f"NFT ADD RULE ERROR: {e}")
+
+
 def create_session(username, ip):
     env = load_env()
     if not env:
@@ -387,24 +433,28 @@ def create_session(username, ip):
 
         user_id = row[0]
 
-        # Very simple unique identifiers
+        # Unique IDs
         ts = int(datetime.utcnow().timestamp())
         session_id = f"{username}-{ts}"
         nft_rule_name = f"traffic_{username}_{ts}"
 
+        # Insert session row
         cur.execute(
             """
             INSERT INTO user_ip_sessions
-                (user_id, ip_address, session_id, nft_rule_name, created_at)
+                (user_id, ip_address, session_id, nft_rule_name, created_at, bytes_in, bytes_out)
             VALUES
-                (%s, %s, %s, %s, NOW())
+                (%s, %s, %s, %s, NOW(), 0, 0)
             """,
             (user_id, ip, session_id, nft_rule_name),
         )
         conn.commit()
         conn.close()
 
-        log(f"Registered session for {username} from {ip} (session_id={session_id})")
+        # Add nftables rule for this IP/session
+        add_nft_rule(ip, nft_rule_name)
+
+        log(f"Registered session for {username} from {ip} (session_id={session_id}, rule={nft_rule_name})")
     except Exception as e:
         log(f"DB ERROR: {e}")
 
@@ -438,7 +488,8 @@ fi
 
 echo -e "${GREEN}✓ PAM traffic session tracking configured${NC}"
 
-echo -e "${GREEN}[6.4/14] Installing Traffic Daemon...${NC}"
+
+echo -e "${GREEN}[6.5/14] Installing Traffic Daemon...${NC}"
 
 # Create traffic daemon script
 cat > /usr/local/bin/traffic_daemon.py << 'TRAFFIC_DAEMON'
@@ -457,7 +508,7 @@ def log(msg):
     try:
         with open(LOG_FILE, "a") as f:
             f.write(f"[{datetime.now()}] {msg}\n")
-    except:
+    except Exception:
         pass
 
 
@@ -497,19 +548,23 @@ def get_nft_json():
         if result.returncode != 0:
             log(f"NFT ERROR: {result.stderr}")
             return None
-        
+
         return json.loads(result.stdout)
     except Exception as e:
         log(f"NFT JSON ERROR: {e}")
         return None
 
 
-def extract_bytes(rule, field="bytes"):
+def extract_bytes(rule):
+    """
+    nft JSON structure:
+      rule: { "expr": [ { "counter": { "packets": X, "bytes": Y } }, ... ] }
+    """
     try:
-        for expr in rule.get("expressions", []):
-            if expr.get("type") == "counter":
-                return expr.get(field, 0)
-    except:
+        for expr in rule.get("expr", []):
+            if "counter" in expr:
+                return int(expr["counter"].get("bytes", 0))
+    except Exception:
         pass
     return 0
 
@@ -529,37 +584,62 @@ def main_loop():
 
             # Load active sessions
             cur.execute("""
-                SELECT id, user_id, nft_rule_name
-                FROM user_ip_sessions
-                WHERE closed_at IS NULL
+                SELECT s.id, s.user_id, s.nft_rule_name, s.bytes_in, s.bytes_out
+                FROM user_ip_sessions s
+                WHERE s.closed_at IS NULL
             """)
             sessions = cur.fetchall()
 
-            for s in sessions:
-                sess_id, user_id, nft_rule_name = s
+            # Build quick lookup for nft rules by comment
+            rules_by_comment = {}
+            try:
+                for item in nft_data.get("nftables", []):
+                    if "rule" in item:
+                        rule = item["rule"]
+                        comment = rule.get("comment")
+                        if comment:
+                            rules_by_comment[comment] = rule
+            except Exception as e:
+                log(f"Parse rules error: {e}")
 
-                # find matching rule
-                found = False
-                for rule in nft_data.get("rules", []):
-                    if rule.get("comment") == nft_rule_name:
-                        found = True
-                        bytes_in = extract_bytes(rule, "bytes")
-                        bytes_out = 0  # optional future use
+            for sess_id, user_id, nft_rule_name, old_in, old_out in sessions:
+                rule = rules_by_comment.get(nft_rule_name)
 
-                        cur.execute("""
-                            UPDATE user_ip_sessions
-                            SET bytes_in=%s, bytes_out=%s
-                            WHERE id=%s
-                        """, (bytes_in, bytes_out, sess_id))
-                        break
+                if rule is None:
+                    # Rule no longer present → treat as ended session (only mark closed)
+                    cur.execute(
+                        "UPDATE user_ip_sessions SET closed_at = NOW() WHERE id = %s AND closed_at IS NULL",
+                        (sess_id,)
+                    )
+                    continue
 
-                if not found:
-                    # rule removed => session ended
-                    cur.execute("""
-                        UPDATE user_ip_sessions
-                        SET closed_at = NOW()
-                        WHERE id = %s AND closed_at IS NULL
-                    """, (sess_id,))
+                new_bytes_in = extract_bytes(rule)
+                if new_bytes_in < 0:
+                    new_bytes_in = 0
+
+                delta_in = max(0, new_bytes_in - (old_in or 0))
+
+                # Update session bytes
+                cur.execute(
+                    """
+                    UPDATE user_ip_sessions
+                    SET bytes_in = %s
+                    WHERE id = %s
+                    """,
+                    (new_bytes_in, sess_id)
+                )
+
+                # Add delta to user_limits.traffic_used_gb
+                if delta_in > 0:
+                    gb = float(delta_in) / (1024.0 * 1024.0 * 1024.0)
+                    cur.execute(
+                        """
+                        UPDATE user_limits
+                        SET traffic_used_gb = traffic_used_gb + %s
+                        WHERE user_id = %s
+                        """,
+                        (gb, user_id)
+                    )
 
             conn.close()
 
@@ -576,7 +656,6 @@ TRAFFIC_DAEMON
 chmod +x /usr/local/bin/traffic_daemon.py
 touch /var/log/traffic_daemon.log
 chmod 666 /var/log/traffic_daemon.log
-
 
 # Create systemd service
 cat > /etc/systemd/system/itbity-traffic.service << 'SERVICE'
@@ -601,7 +680,6 @@ systemctl enable itbity-traffic
 systemctl start itbity-traffic
 
 echo -e "${GREEN}✓ Traffic Daemon installed and running${NC}"
-
 
 
 
