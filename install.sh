@@ -438,6 +438,174 @@ fi
 
 echo -e "${GREEN}✓ PAM traffic session tracking configured${NC}"
 
+echo -e "${GREEN}[6.4/14] Installing Traffic Daemon...${NC}"
+
+# Create traffic daemon script
+cat > /usr/local/bin/traffic_daemon.py << 'TRAFFIC_DAEMON'
+#!/usr/bin/env python3
+import time
+import subprocess
+import pymysql
+import json
+from datetime import datetime
+
+ENV_FILE = "/var/www/itbity-ssh-panel/.env"
+LOG_FILE = "/var/log/traffic_daemon.log"
+
+
+def log(msg):
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{datetime.now()}] {msg}\n")
+    except:
+        pass
+
+
+def load_env():
+    env = {}
+    try:
+        with open(ENV_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    env[key.strip()] = value.strip().strip("'\"")
+    except Exception as e:
+        log(f"Failed to load .env: {e}")
+    return env
+
+
+def db():
+    env = load_env()
+    return pymysql.connect(
+        host=env.get("DB_HOST", "localhost"),
+        user=env.get("DB_USER"),
+        password=env.get("DB_PASSWORD"),
+        database=env.get("DB_NAME"),
+        charset="utf8mb4",
+        autocommit=True,
+    )
+
+
+def get_nft_json():
+    try:
+        result = subprocess.run(
+            ["nft", "-j", "list", "chain", "inet", "itbity_traffic", "users"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            log(f"NFT ERROR: {result.stderr}")
+            return None
+        
+        return json.loads(result.stdout)
+    except Exception as e:
+        log(f"NFT JSON ERROR: {e}")
+        return None
+
+
+def extract_bytes(rule, field="bytes"):
+    try:
+        for expr in rule.get("expressions", []):
+            if expr.get("type") == "counter":
+                return expr.get(field, 0)
+    except:
+        pass
+    return 0
+
+
+def main_loop():
+    log("Traffic daemon started.")
+
+    while True:
+        try:
+            nft_data = get_nft_json()
+            if not nft_data:
+                time.sleep(5)
+                continue
+
+            conn = db()
+            cur = conn.cursor()
+
+            # Load active sessions
+            cur.execute("""
+                SELECT id, user_id, nft_rule_name
+                FROM user_ip_sessions
+                WHERE closed_at IS NULL
+            """)
+            sessions = cur.fetchall()
+
+            for s in sessions:
+                sess_id, user_id, nft_rule_name = s
+
+                # find matching rule
+                found = False
+                for rule in nft_data.get("rules", []):
+                    if rule.get("comment") == nft_rule_name:
+                        found = True
+                        bytes_in = extract_bytes(rule, "bytes")
+                        bytes_out = 0  # optional future use
+
+                        cur.execute("""
+                            UPDATE user_ip_sessions
+                            SET bytes_in=%s, bytes_out=%s
+                            WHERE id=%s
+                        """, (bytes_in, bytes_out, sess_id))
+                        break
+
+                if not found:
+                    # rule removed => session ended
+                    cur.execute("""
+                        UPDATE user_ip_sessions
+                        SET closed_at = NOW()
+                        WHERE id = %s AND closed_at IS NULL
+                    """, (sess_id,))
+
+            conn.close()
+
+        except Exception as e:
+            log(f"MAIN LOOP ERROR: {e}")
+
+        time.sleep(5)
+
+
+if __name__ == "__main__":
+    main_loop()
+TRAFFIC_DAEMON
+
+chmod +x /usr/local/bin/traffic_daemon.py
+touch /var/log/traffic_daemon.log
+chmod 666 /var/log/traffic_daemon.log
+
+
+# Create systemd service
+cat > /etc/systemd/system/itbity-traffic.service << 'SERVICE'
+[Unit]
+Description=ITBity Traffic Daemon
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/traffic_daemon.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable itbity-traffic
+systemctl start itbity-traffic
+
+echo -e "${GREEN}✓ Traffic Daemon installed and running${NC}"
+
+
+
+
+
 
 echo -e "${GREEN}[7/14] Setting up project directory...${NC}"
 mkdir -p $PROJECT_DIR
