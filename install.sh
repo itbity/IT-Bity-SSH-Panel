@@ -346,7 +346,7 @@ fi
 echo -e "${GREEN}✓ NFTables traffic table & chain configured${NC}"
 
 
-echo -e "${GREEN}[6.4/14] Configuring PAM for traffic session tracking...${NC}"
+echo -e "${GREEN}[6.4/14] Configuring PAM for traffic session tracking (UID-based)...${NC}"
 
 # Create traffic session registration script
 cat > /usr/local/bin/register_session.py << 'TRAFFIC_SCRIPT'
@@ -355,11 +355,13 @@ cat > /usr/local/bin/register_session.py << 'TRAFFIC_SCRIPT'
 import os
 import sys
 import subprocess
+import json
+import pwd
 from datetime import datetime, UTC
 
 LOG_FILE = "/var/log/ssh_session_register.log"
 ENV_FILE = "/var/www/itbity-ssh-panel/.env"
-NFT_BIN = "/usr/sbin/nft"   # correct nft path on Ubuntu
+NFT_BIN = "/usr/sbin/nft"   # nft path on Ubuntu
 
 
 # ===========================================================
@@ -393,35 +395,78 @@ def load_env():
 
 
 # ===========================================================
-# CREATE NFT RULE
+# NFT HELPERS (UID rule)
 # ===========================================================
-def add_nft_rule(ip: str, rule_name: str) -> None:
-    """Add nftables counter rule for this session."""
+def uid_rule_exists(uid: int) -> bool:
+    """Check if we already have a uid-based rule for this uid."""
+    try:
+        result = subprocess.run(
+            [NFT_BIN, "-j", "list", "chain", "inet", "itbity_traffic", "users"],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode != 0:
+            log(f"NFT LIST ERROR: {result.stderr.strip()}")
+            return False
+
+        data = json.loads(result.stdout)
+        comment = f"user_uid_{uid}"
+        for rule in data.get("rules", []):
+            if rule.get("comment") == comment:
+                return True
+    except Exception as e:
+        log(f"NFT uid_rule_exists ERROR: {e}")
+    return False
+
+
+def add_uid_rule(uid: int) -> None:
+    """Add nftables counter rule for this UID if not exists."""
+    comment = f"user_uid_{uid}"
+
+    if uid_rule_exists(uid):
+        log(f"NFT UID RULE EXISTS: UID={uid} rule={comment}")
+        return
+
     try:
         subprocess.run(
             [
                 NFT_BIN,
                 "add", "rule",
                 "inet", "itbity_traffic", "users",
-                "ip", "saddr", ip,
+                "meta", "skuid", str(uid),
                 "counter",
-                "comment", rule_name
+                "comment", comment
             ],
-            timeout=2
+            timeout=2,
+            capture_output=True,
+            text=True,
         )
-        log(f"NFT rule added: {rule_name}")
+        log(f"NFT UID RULE CREATED: UID={uid} rule={comment}")
     except Exception as e:
-        log(f"NFT ADD RULE ERROR: {e}")
+        log(f"NFT ADD UID RULE ERROR: {e}")
 
 
 # ===========================================================
-# REGISTER SESSION (DB + NFT RULE)
+# REGISTER SESSION (DB + UID RULE)
 # ===========================================================
-def register_session(username: str, ip: str, tty: str) -> None:
+def register_session(username: str, ip: str) -> None:
     env = load_env()
     if not env:
         log("Env not loaded — skipping DB insert")
         return
+
+    # resolve Linux UID for this ssh/vpn user
+    try:
+        pw = pwd.getpwnam(username)
+        uid = pw.pw_uid
+    except Exception as e:
+        log(f"Failed to get uid for user={username}: {e}")
+        return
+
+    # create UID rule (if needed)
+    add_uid_rule(uid)
+    nft_rule_name = f"user_uid_{uid}"
 
     try:
         import pymysql
@@ -435,22 +480,20 @@ def register_session(username: str, ip: str, tty: str) -> None:
         )
         cur = conn.cursor()
 
-        # Fetch user_id
+        # Fetch panel user_id
         cur.execute("SELECT id FROM users WHERE username=%s", (username,))
         row = cur.fetchone()
         if not row:
-            log(f"User not found: {username}")
+            log(f"Panel user not found: {username}")
             conn.close()
             return
 
         user_id = row[0]
 
-        # Unique session id based on username + tty + timestamp
         ts = int(datetime.now(UTC).timestamp())
-        session_id = f"{username}-{tty}-{ts}"
-        rule_name = f"traffic_{username}_{tty}_{ts}"
+        session_id = f"{username}-{uid}-{ts}"
 
-        # Insert session row
+        # Insert session row; all sessions of same UID share same nft_rule_name
         cur.execute(
             """
             INSERT INTO user_ip_sessions
@@ -458,15 +501,15 @@ def register_session(username: str, ip: str, tty: str) -> None:
             VALUES
                 (%s, %s, %s, %s, NOW(), 0, 0)
             """,
-            (user_id, ip, session_id, rule_name),
+            (user_id, ip, session_id, nft_rule_name),
         )
         conn.commit()
         conn.close()
 
-        # Add nftables rule for this session
-        add_nft_rule(ip, rule_name)
-
-        log(f"Registered session: user={username}, ip={ip}, tty={tty}, rule={rule_name}")
+        log(
+            f"DB session added: user={username}, uid={uid}, "
+            f"ip={ip}, session={session_id}, rule={nft_rule_name}"
+        )
     except Exception as e:
         log(f"DB ERROR: {e}")
 
@@ -477,18 +520,20 @@ def register_session(username: str, ip: str, tty: str) -> None:
 def main() -> None:
     username = os.environ.get("PAM_USER")
     ip = os.environ.get("PAM_RHOST")
-    tty = os.environ.get("PAM_TTY", "notty")
+
+    # TTY برای ما مهم نیست در نسخه UID، ولی اگر خواستی برای دیباگ:
+    # tty = os.environ.get("PAM_TTY", "notty")
 
     if not username or not ip:
         log(f"Missing PAM_USER or PAM_RHOST (user={username}, ip={ip})")
         sys.exit(0)
 
-    # Ignore root (not a panel user)
+    # Ignore root (not managed by panel)
     if username == "root":
         log("Skipping root session")
         sys.exit(0)
 
-    register_session(username, ip, tty)
+    register_session(username, ip)
     sys.exit(0)
 
 
@@ -507,7 +552,7 @@ if ! grep -q "register_session.py" /etc/pam.d/sshd; then
     sed -i '/^@include common-session/a # ITBity Panel - Register traffic session\nsession    required    pam_exec.so /usr/local/bin/register_session.py' /etc/pam.d/sshd
 fi
 
-echo -e "${GREEN}✓ PAM traffic session tracking configured${NC}"
+echo -e "${GREEN}✓ PAM traffic session tracking (UID-based) configured${NC}"
 
 
 
