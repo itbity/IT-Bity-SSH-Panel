@@ -359,10 +359,11 @@ from datetime import datetime
 
 LOG_FILE = "/var/log/ssh_session_register.log"
 ENV_FILE = "/var/www/itbity-ssh-panel/.env"
-NFT_BIN = "/usr/sbin/nft"   # مسیر صحیح nft روی ubuntu
+NFT_BIN = "/usr/sbin/nft"   # correct nft path on ubuntu
 
 
 def log(msg):
+    """Safe logger"""
     try:
         with open(LOG_FILE, "a") as f:
             f.write(f"[{datetime.now()}] {msg}\n")
@@ -371,6 +372,7 @@ def log(msg):
 
 
 def load_env():
+    """Load .env settings"""
     env = {}
     try:
         with open(ENV_FILE, "r") as f:
@@ -385,25 +387,29 @@ def load_env():
 
 
 def add_nft_rule(ip, rule_name):
-    """Add nftables rule for this session."""
+    """Add nftables counter rule for this session"""
     try:
-        cmd = [
-            NFT_BIN,
-            "add", "rule", "inet", "itbity_traffic", "users",
-            "ip", "saddr", ip,
-            "counter",
-            "comment", rule_name
-        ]
-        subprocess.run(cmd, timeout=2)
+        subprocess.run(
+            [
+                NFT_BIN,
+                "add", "rule",
+                "inet", "itbity_traffic", "users",
+                "ip", "saddr", ip,
+                "counter",
+                "comment", rule_name
+            ],
+            timeout=2
+        )
         log(f"NFT rule added: {rule_name}")
     except Exception as e:
         log(f"NFT ADD RULE ERROR: {e}")
 
 
 def register_session(username, ip):
+    """Insert session into DB and add nft rule"""
     env = load_env()
     if not env:
-        log("Env not loaded, skipping DB insert")
+        log("Env not loaded — skipping DB insert")
         return
 
     try:
@@ -418,7 +424,7 @@ def register_session(username, ip):
         )
         cur = conn.cursor()
 
-        # Getting user_id
+        # Get user_id
         cur.execute("SELECT id FROM users WHERE username=%s", (username,))
         row = cur.fetchone()
 
@@ -433,17 +439,17 @@ def register_session(username, ip):
         session_id = f"{username}-{ts}"
         rule_name = f"traffic_{username}_{ts}"
 
-        # Insert into DB
+        # Insert session row
         cur.execute("""
             INSERT INTO user_ip_sessions
                 (user_id, ip_address, session_id, nft_rule_name, created_at, bytes_in, bytes_out)
             VALUES (%s, %s, %s, %s, NOW(), 0, 0)
-        """,
-        (user_id, ip, session_id, rule_name))
+        """, (user_id, ip, session_id, rule_name))
 
         conn.commit()
         conn.close()
 
+        # Create nftables counter
         add_nft_rule(ip, rule_name)
 
         log(f"Registered session: user={username}, ip={ip}, rule={rule_name}")
@@ -456,8 +462,14 @@ def main():
     username = os.environ.get("PAM_USER")
     ip = os.environ.get("PAM_RHOST")
 
+    # Ignore missing params
     if not username or not ip:
-        log(f"PAM missing username or ip: user={username}, ip={ip}")
+        log(f"Missing PAM_USER or PAM_RHOST (user={username}, ip={ip})")
+        sys.exit(0)
+
+    # Skip root — root is not a panel user
+    if username == "root":
+        log("Skipping root session")
         sys.exit(0)
 
     register_session(username, ip)
@@ -480,6 +492,7 @@ if ! grep -q "register_session.py" /etc/pam.d/sshd; then
 fi
 
 echo -e "${GREEN}✓ PAM traffic session tracking configured${NC}"
+
 
 
 
