@@ -346,6 +346,7 @@ fi
 echo -e "${GREEN}✓ NFTables traffic table & chain configured${NC}"
 
 
+
 echo -e "${GREEN}[6.4/14] Configuring PAM for traffic session tracking...${NC}"
 
 # Create traffic session registration script
@@ -359,11 +360,13 @@ from datetime import datetime
 
 LOG_FILE = "/var/log/ssh_session_register.log"
 ENV_FILE = "/var/www/itbity-ssh-panel/.env"
-NFT_BIN = "/usr/sbin/nft"   # correct nft path on ubuntu
+NFT_BIN = "/usr/sbin/nft"   # correct nft path
 
 
+# ===========================================================
+# SAFE LOGGER
+# ===========================================================
 def log(msg):
-    """Safe logger"""
     try:
         with open(LOG_FILE, "a") as f:
             f.write(f"[{datetime.now()}] {msg}\n")
@@ -371,23 +374,27 @@ def log(msg):
         pass
 
 
+# ===========================================================
+# LOAD .env
+# ===========================================================
 def load_env():
-    """Load .env settings"""
     env = {}
     try:
         with open(ENV_FILE, "r") as f:
             for line in f:
                 line = line.strip()
                 if "=" in line and not line.startswith("#"):
-                    key, value = line.split("=", 1)
-                    env[key.strip()] = value.strip().strip("'\"")
+                    k, v = line.split("=", 1)
+                    env[k.strip()] = v.strip().strip("'\"")
     except Exception as e:
         log(f"Failed to load .env: {e}")
     return env
 
 
+# ===========================================================
+# CREATE NFT RULE
+# ===========================================================
 def add_nft_rule(ip, rule_name):
-    """Add nftables counter rule for this session"""
     try:
         subprocess.run(
             [
@@ -405,8 +412,10 @@ def add_nft_rule(ip, rule_name):
         log(f"NFT ADD RULE ERROR: {e}")
 
 
-def register_session(username, ip):
-    """Insert session into DB and add nft rule"""
+# ===========================================================
+# REGISTER SESSION (DB + NFT RULE)
+# ===========================================================
+def register_session(username, ip, pam_pid, pam_tty):
     env = load_env()
     if not env:
         log("Env not loaded — skipping DB insert")
@@ -424,10 +433,9 @@ def register_session(username, ip):
         )
         cur = conn.cursor()
 
-        # Get user_id
+        # Fetch user_id
         cur.execute("SELECT id FROM users WHERE username=%s", (username,))
         row = cur.fetchone()
-
         if not row:
             log(f"User not found: {username}")
             conn.close()
@@ -435,11 +443,11 @@ def register_session(username, ip):
 
         user_id = row[0]
 
-        ts = int(datetime.utcnow().timestamp())
-        session_id = f"{username}-{ts}"
-        rule_name = f"traffic_{username}_{ts}"
+        # NEW SESSION ID BASED ON PID + TTY
+        session_id = f"{username}-{pam_pid}-{pam_tty}"
+        rule_name = f"traffic_{username}_{pam_pid}"
 
-        # Insert session row
+        # Insert session
         cur.execute("""
             INSERT INTO user_ip_sessions
                 (user_id, ip_address, session_id, nft_rule_name, created_at, bytes_in, bytes_out)
@@ -449,30 +457,34 @@ def register_session(username, ip):
         conn.commit()
         conn.close()
 
-        # Create nftables counter
+        # Add nft rule
         add_nft_rule(ip, rule_name)
 
-        log(f"Registered session: user={username}, ip={ip}, rule={rule_name}")
+        log(f"Registered session: user={username}, ip={ip}, pid={pam_pid}, tty={pam_tty}")
 
     except Exception as e:
         log(f"DB ERROR: {e}")
 
 
+# ===========================================================
+# MAIN ENTRY POINT
+# ===========================================================
 def main():
     username = os.environ.get("PAM_USER")
     ip = os.environ.get("PAM_RHOST")
+    pam_pid = os.environ.get("PAM_PID")
+    pam_tty = os.environ.get("PAM_TTY", "notty")  # sometimes empty with SFTP
 
-    # Ignore missing params
     if not username or not ip:
-        log(f"Missing PAM_USER or PAM_RHOST (user={username}, ip={ip})")
+        log(f"PAM vars missing (user={username}, ip={ip})")
         sys.exit(0)
 
-    # Skip root — root is not a panel user
+    # ignore root
     if username == "root":
-        log("Skipping root session")
+        log("Skipping root user")
         sys.exit(0)
 
-    register_session(username, ip)
+    register_session(username, ip, pam_pid, pam_tty)
     sys.exit(0)
 
 
@@ -486,7 +498,7 @@ chown root:root /usr/local/bin/register_session.py
 touch /var/log/ssh_session_register.log
 chmod 666 /var/log/ssh_session_register.log
 
-# Add PAM session hook if not exists
+# Add PAM hook if needed
 if ! grep -q "register_session.py" /etc/pam.d/sshd; then
     sed -i '/^@include common-session/a # ITBity Panel - Register traffic session\nsession    required    pam_exec.so /usr/local/bin/register_session.py' /etc/pam.d/sshd
 fi
