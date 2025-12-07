@@ -1,9 +1,12 @@
-# app/models.py
 from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
+
+# ==============================
+# User Table
+# ==============================
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -14,36 +17,45 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime)
-    
-    # Relationship
+
+    # Relationships
     limits = db.relationship('UserLimit', backref='user', uselist=False, cascade='all, delete-orphan')
-    
+    ip_sessions = db.relationship('UserIPSession', backref='user', lazy=True, cascade='all, delete-orphan')
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-    
+
     @property
     def user_type(self):
         return self.role
-    
+
     def __repr__(self):
         return f'<User {self.username}>'
 
 
+# ==============================
+# User Limits (Traffic, Connections)
+# ==============================
 class UserLimit(db.Model):
     __tablename__ = 'user_limits'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True)
+    user_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False,
+        unique=True
+    )
     
     traffic_limit_gb = db.Column(db.Integer, default=50, nullable=False)
     traffic_used_gb = db.Column(db.Float, default=0.0, nullable=False)
     max_connections = db.Column(db.Integer, default=2, nullable=False)
     download_speed_mbps = db.Column(db.Integer, default=0, nullable=False)  # 0 = unlimited
     expires_at = db.Column(db.DateTime)
-    
+
     @property
     def traffic_remaining_gb(self):
         return max(0, self.traffic_limit_gb - self.traffic_used_gb)
@@ -56,3 +68,35 @@ class UserLimit(db.Model):
     
     def __repr__(self):
         return f'<UserLimit user_id={self.user_id}>'
+
+
+# ==============================
+# NEW TABLE: Per-IP Traffic Sessions
+# ==============================
+class UserIPSession(db.Model):
+    __tablename__ = 'user_ip_sessions'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False
+    )
+
+    ip_address = db.Column(db.String(45), nullable=False)       # IPv4 / IPv6
+    session_id = db.Column(db.String(128), nullable=False)      # Unique for PAM session
+    nft_rule_name = db.Column(db.String(128), nullable=False)   # nftables rule identifier
+
+    bytes_in = db.Column(db.BigInteger, default=0, nullable=False)
+    bytes_out = db.Column(db.BigInteger, default=0, nullable=False)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    closed_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return f'<UserIPSession user_id={self.user_id} ip={self.ip_address}>'
